@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase, USER_ID } from '../lib/supabase'
 import Hero from '../components/Hero'
 import PrepaidCard from '../components/PrepaidCard'
-import StatsBar from '../components/StatsBar'
 import AddExpenseForm from '../components/AddExpenseForm'
 import CategoryChart from '../components/CategoryChart'
 import CityBreakdown from '../components/CityBreakdown'
@@ -82,23 +81,33 @@ export default function Dashboard() {
       </nav>
 
       <main style={styles.main}>
-        <div className="fade-up"><Hero expenses={expenses} config={config} /></div>
-
-        <div className="fade-up-2">
-          <BudgetConfig config={config} onSave={handleSaveConfig} />
+        {/* 1. Hero — big number */}
+        <div className="fade-up">
+          <Hero expenses={expenses} config={config} />
         </div>
 
-        <div className="fade-up-2"><PrepaidCard config={config} /></div>
-        <div className="fade-up-3"><StatsBar expenses={expenses} config={config} /></div>
-
+        {/* 2. Add expense form */}
         <div style={styles.sectionLabel}>Agregar gasto</div>
-        <div className="fade-up-4"><AddExpenseForm onAdd={handleAdd} /></div>
+        <div className="fade-up-2">
+          <AddExpenseForm onAdd={handleAdd} />
+        </div>
 
+        {/* 3. Config + prepaid */}
+        <div className="fade-up-3">
+          <BudgetConfig config={config} onSave={handleSaveConfig} />
+        </div>
+        <div className="fade-up-3">
+          <PrepaidCard config={config} />
+        </div>
+
+        {/* 4. Charts + breakdown */}
+        <div style={styles.sectionLabel}>Desglose</div>
         <div style={styles.chartsGrid}>
           <CategoryChart expenses={expenses} />
           <CityBreakdown expenses={expenses} />
         </div>
 
+        {/* 5. Expense list */}
         <div style={styles.sectionLabel}>Gastos recientes</div>
         <ExpenseList expenses={expenses} onDelete={handleDelete} />
       </main>
@@ -113,5 +122,5 @@ const styles = {
   navTitle: { fontFamily: 'var(--font-display)', fontSize: 18, color: '#fff' },
   main: { maxWidth: 640, margin: '0 auto', padding: '20px 16px 60px', position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: 12 },
   sectionLabel: { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)', marginTop: 12, marginBottom: -4 },
-  chartsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginTop: 8 },
+  chartsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 },
 }
