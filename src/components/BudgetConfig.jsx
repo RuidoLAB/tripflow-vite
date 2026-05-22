@@ -1,16 +1,22 @@
 import { useState } from 'react'
-import { fmt } from '../lib/budget'
+import { fmt, TIMEZONES } from '../lib/budget'
 
 export default function BudgetConfig({ config, onSave }) {
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState(config)
 
   function handleChange(key, value) {
-    setForm(prev => ({ ...prev, [key]: parseFloat(value) || 0 }))
+    setForm(prev => ({ ...prev, [key]: key === 'totalDays' ? parseInt(value) || 1 : parseFloat(value) || 0 }))
   }
 
   function handlePrepaid(key, value) {
     setForm(prev => ({ ...prev, prepaid: { ...prev.prepaid, [key]: parseFloat(value) || 0 } }))
+  }
+
+  function handleStartNow() {
+    const tz = form.timezone || 'America/New_York'
+    const now = new Date().toISOString()
+    setForm(prev => ({ ...prev, startDate: now }))
   }
 
   function handleSave() {
@@ -18,15 +24,24 @@ export default function BudgetConfig({ config, onSave }) {
     setOpen(false)
   }
 
-  const totalPrepaid = form.prepaid.flights + form.prepaid.parks + form.prepaid.hotel
-  const usable = form.totalBudget - totalPrepaid
+  const totalPrepaid = (form.prepaid?.flights || 0) + (form.prepaid?.parks || 0) + (form.prepaid?.hotel || 0)
+  const usable = (form.totalBudget || 0) - totalPrepaid
+  const dailyFixed = usable / (form.totalDays || 16)
+
+  const startLabel = form.startDate
+    ? new Date(form.startDate).toLocaleString('es-CL', { timeZone: form.timezone || 'America/New_York', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    : null
 
   if (!open) return (
     <button onClick={() => setOpen(true)} style={styles.trigger}>
       <span style={styles.triggerIcon}>⚙</span>
       <div style={{ flex: 1 }}>
         <div style={styles.triggerTitle}>Configurar presupuesto</div>
-        <div style={styles.triggerSub}>Total: {fmt(form.totalBudget)} · Disponible para gastar: {fmt(Math.max(usable, 0))}</div>
+        <div style={styles.triggerSub}>
+          {config.startDate
+            ? `Viaje iniciado · ${config.totalDays} días · ${fmt(config.totalUsable || 0)} usable`
+            : 'Configura tu presupuesto e inicia el viaje'}
+        </div>
       </div>
       <span style={styles.chevron}>›</span>
     </button>
@@ -39,32 +54,70 @@ export default function BudgetConfig({ config, onSave }) {
         <button onClick={() => setOpen(false)} style={styles.closeBtn}>×</button>
       </div>
 
+      {/* Budget */}
       <div style={styles.section}>
         <div style={styles.sectionLabel}>Presupuesto total del viaje</div>
         <div style={styles.inputRow}>
           <span style={styles.prefix}>USD</span>
-          <input type="number" value={form.totalBudget} onChange={e => handleChange('totalBudget', e.target.value)} style={styles.input} min="0" />
+          <input type="number" value={form.totalBudget || ''} onChange={e => handleChange('totalBudget', e.target.value)} placeholder="3500" min="0" style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 600 }} />
         </div>
       </div>
 
+      {/* Prepaid */}
       <div style={styles.section}>
-        <div style={styles.sectionLabel}>Pagado antes del viaje (no afecta ppto. diario)</div>
+        <div style={styles.sectionLabel}>Pagado antes del viaje</div>
         <div style={styles.prepaidGrid}>
-          <PrepaidInput label="✈ Vuelos" value={form.prepaid.flights} onChange={v => handlePrepaid('flights', v)} />
-          <PrepaidInput label="🏰 Parques" value={form.prepaid.parks} onChange={v => handlePrepaid('parks', v)} />
-          <PrepaidInput label="🏨 Hotel" value={form.prepaid.hotel} onChange={v => handlePrepaid('hotel', v)} />
+          <PrepaidInput label="✈ Vuelos" value={form.prepaid?.flights || ''} onChange={v => handlePrepaid('flights', v)} />
+          <PrepaidInput label="🏰 Parques" value={form.prepaid?.parks || ''} onChange={v => handlePrepaid('parks', v)} />
+          <PrepaidInput label="🏨 Hotel" value={form.prepaid?.hotel || ''} onChange={v => handlePrepaid('hotel', v)} />
         </div>
       </div>
 
+      {/* Duration */}
+      <div style={styles.section}>
+        <div style={styles.sectionLabel}>Duración del viaje</div>
+        <div style={styles.inputRow}>
+          <input type="number" value={form.totalDays || ''} onChange={e => handleChange('totalDays', e.target.value)} placeholder="16" min="1" max="90" style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 600 }} />
+          <span style={styles.suffix}>días</span>
+        </div>
+      </div>
+
+      {/* Timezone */}
+      <div style={styles.section}>
+        <div style={styles.sectionLabel}>Zona horaria actual</div>
+        <select value={form.timezone || 'America/New_York'} onChange={e => setForm(prev => ({ ...prev, timezone: e.target.value }))}>
+          {TIMEZONES.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
+        </select>
+        <p style={styles.hint}>Cámbiala cuando te muevas de ciudad. El cambio de día ocurre a medianoche en esta zona.</p>
+      </div>
+
+      {/* Start date */}
+      <div style={styles.section}>
+        <div style={styles.sectionLabel}>Inicio del viaje</div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'stretch' }}>
+          <button onClick={handleStartNow} style={styles.startBtn}>
+            {form.startDate ? '🔄 Reiniciar desde ahora' : '🚀 Iniciar viaje ahora'}
+          </button>
+        </div>
+        <div style={styles.manualRow}>
+          <span style={styles.hint}>O ajusta manualmente:</span>
+          <input
+            type="datetime-local"
+            value={form.startDate ? new Date(form.startDate).toISOString().slice(0,16) : ''}
+            onChange={e => setForm(prev => ({ ...prev, startDate: new Date(e.target.value).toISOString() }))}
+            style={{ fontSize: 13 }}
+          />
+        </div>
+        {startLabel && (
+          <div style={styles.startedBadge}>✓ Iniciado el {startLabel} ({TIMEZONES.find(t => t.value === (form.timezone || 'America/New_York'))?.label.split(' — ')[0]})</div>
+        )}
+      </div>
+
+      {/* Summary */}
       <div style={styles.summary}>
-        <div style={styles.summaryRow}>
-          <span style={{ color: 'rgba(255,255,255,0.4)' }}>Total prepagado</span>
-          <span style={{ fontFamily: 'var(--font-mono)' }}>{fmt(totalPrepaid)}</span>
-        </div>
-        <div style={styles.summaryRow}>
-          <span style={{ color: 'rgba(255,255,255,0.4)' }}>Disponible para gastar</span>
-          <span style={{ fontFamily: 'var(--font-mono)', color: '#4AE6A4', fontWeight: 600 }}>{fmt(Math.max(usable, 0))}</span>
-        </div>
+        <SummaryRow label="Total prepagado" value={fmt(totalPrepaid)} />
+        <SummaryRow label="Disponible para gastar" value={fmt(Math.max(usable, 0))} color="#4AE6A4" />
+        <SummaryRow label="Presupuesto diario fijo" value={`${fmt(dailyFixed)}/día`} color="#60AAFF" />
       </div>
 
       <button className="btn-primary" onClick={handleSave}>Guardar configuración</button>
@@ -84,6 +137,15 @@ function PrepaidInput({ label, value, onChange }) {
   )
 }
 
+function SummaryRow({ label, value, color }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13 }}>
+      <span style={{ color: 'rgba(255,255,255,0.4)' }}>{label}</span>
+      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: color || '#fff' }}>{value}</span>
+    </div>
+  )
+}
+
 const styles = {
   trigger: { width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' },
   triggerIcon: { width: 32, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 },
@@ -98,8 +160,11 @@ const styles = {
   sectionLabel: { fontSize: 11, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em' },
   inputRow: { display: 'flex', alignItems: 'center', gap: 10 },
   prefix: { fontSize: 13, color: 'rgba(255,255,255,0.3)', flexShrink: 0 },
-  input: { fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 600 },
+  suffix: { fontSize: 13, color: 'rgba(255,255,255,0.3)', flexShrink: 0 },
   prepaidGrid: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 },
+  hint: { fontSize: 11, color: 'rgba(255,255,255,0.2)', marginTop: 4 },
+  startBtn: { flex: 1, background: 'rgba(74,230,164,0.1)', border: '1px solid rgba(74,230,164,0.2)', borderRadius: 12, padding: '12px 16px', color: '#4AE6A4', fontSize: 14, fontWeight: 600, cursor: 'pointer' },
+  manualRow: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 },
+  startedBadge: { fontSize: 12, color: '#4AE6A4', background: 'rgba(74,230,164,0.08)', border: '1px solid rgba(74,230,164,0.15)', borderRadius: 8, padding: '8px 12px' },
   summary: { background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 },
-  summaryRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13 },
 }
