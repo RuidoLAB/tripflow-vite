@@ -44,7 +44,7 @@ export default function AddExpenseForm({ onAdd }) {
 
       <div>
         <div style={styles.label}>Fecha</div>
-        <input type="date" value={date} onChange={e => setDate(e.target.value)} min="2025-07-24" max="2025-08-08" />
+        <input type="date" value={date} onChange={e => setDate(e.target.value)} />
       </div>
 
       <div style={styles.toggleRow} onClick={() => setPrepaid(!prepaid)}>
