@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { CATEGORIES, CITIES } from '../lib/budget'
 import { format } from 'date-fns'
-
+ 
 export default function AddExpenseForm({ onAdd }) {
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('comida')
