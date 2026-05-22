@@ -1,15 +1,16 @@
-import { getDailyBudget, getRemaining, getTotalSpent, getRemainingDays, getTodaySpent, getDaysElapsed, getTripDays, fmt, fmtDec, TRIP } from '../lib/budget'
 
-export default function Hero({ expenses }) {
-  const daily = getDailyBudget(expenses)
-  const remaining = getRemaining(expenses)
+import { getDailyBudget, getRemaining, getTotalSpent, getRemainingDays, getTodaySpent, getDaysElapsed, getTripDays, fmt, fmtDec } from '../lib/budget'
+
+export default function Hero({ expenses, config }) {
+  const daily = getDailyBudget(expenses, config)
+  const remaining = getRemaining(expenses, config)
   const totalSpent = getTotalSpent(expenses)
   const remainingDays = getRemainingDays()
   const todaySpent = getTodaySpent(expenses)
   const daysElapsed = getDaysElapsed()
   const totalDays = getTripDays()
 
-  const budgetPct = Math.min((totalSpent / TRIP.totalUsable) * 100, 100)
+  const budgetPct = Math.min((totalSpent / config.totalUsable) * 100, 100)
   const daysPct = (daysElapsed / totalDays) * 100
   const isOver = budgetPct > daysPct + 5
   const isUnder = budgetPct < daysPct - 5
@@ -34,7 +35,7 @@ export default function Hero({ expenses }) {
         </div>
 
         <div style={styles.substats}>
-          <SubStat label="Ppto. total" value={fmt(TRIP.totalUsable)} />
+          <SubStat label="Ppto. usable" value={fmt(config.totalUsable)} />
           <SubStat label="Gastado" value={fmt(totalSpent)} color="#FFB547" />
           <SubStat label="Restante" value={fmt(remaining)} color="#4AE6A4" />
           <SubStat label="Días rest." value={`${remainingDays}d`} />
