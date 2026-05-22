@@ -15,6 +15,12 @@ export default function Hero({ expenses, config }) {
   const { started, ended, dayNumber, remainingDays, totalDays } = getTripInfo(config)
 
   const totalUsable = config?.totalUsable || 1450
+
+  // What's left to spend today
+  const todayBudget = adjusted  // fixed + yesterday delta
+  const todayLeft = todayBudget - todaySpent
+  const todayPct = todayBudget > 0 ? Math.min((todaySpent / todayBudget) * 100, 100) : 0
+
   const budgetPct = Math.min((totalSpent / totalUsable) * 100, 100)
   const daysPct = totalDays > 0 ? ((dayNumber - 1) / totalDays) * 100 : 0
   const isOver = budgetPct > daysPct + 5
@@ -24,8 +30,6 @@ export default function Hero({ expenses, config }) {
 
   const hasDelta = Math.abs(delta) > 0.5
   const deltaPositive = delta >= 0
-  const todayPct = fixed > 0 ? Math.min((todaySpent / fixed) * 100, 100) : 0
-  const todayRemaining = fixed - todaySpent
 
   if (!started) return (
     <div style={styles.card}>
@@ -49,11 +53,14 @@ export default function Hero({ expenses, config }) {
     </div>
   )
 
+  const bigNumberColor = todayLeft < 0 ? '#FF5757' : todayLeft < fixed * 0.2 ? '#FFB547' : '#fff'
+
   return (
     <div style={styles.card}>
       <div style={styles.bg1} /><div style={styles.bg2} />
       <div style={{ position: 'relative', zIndex: 1 }}>
 
+        {/* Top row */}
         <div style={styles.topRow}>
           <div style={{ ...styles.badge, background: `${statusColor}18`, border: `1px solid ${statusColor}30`, color: statusColor }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor, display: 'inline-block' }} />
@@ -62,38 +69,50 @@ export default function Hero({ expenses, config }) {
           <div style={styles.dayBadge}>Día {dayNumber} de {totalDays}</div>
         </div>
 
-        {/* Big number + adjusted pill */}
-        <p style={styles.label}>Presupuesto diario</p>
+        {/* BIG number — what's left today */}
+        <p style={styles.label}>Disponible para gastar hoy</p>
         <div style={styles.amountRow}>
-          <span style={styles.amount}>{fmt(fixed)}</span>
+          <span style={{ ...styles.amount, color: bigNumberColor }}>
+            {fmt(Math.max(todayLeft, 0))}
+          </span>
           <span style={styles.currency}>USD</span>
-          {hasDelta && (
-            <div style={styles.adjustedPill}>
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>real hoy</span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 600, color: deltaPositive ? '#4AE6A4' : '#FF5757', lineHeight: 1 }}>
-                {fmt(adjusted)}
-              </span>
-              <span style={{ fontSize: 11, color: deltaPositive ? '#4AE6A4' : '#FF5757' }}>
-                {deltaPositive ? `+${fmt(delta)}` : fmt(delta)} de ayer
-              </span>
-            </div>
-          )}
-        </div>
 
-        {/* Today bar */}
-        <div style={styles.todaySection}>
-          <div style={styles.todayHeader}>
-            <span style={styles.todayLabel}>Gastado hoy</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 14, color: todayPct > 90 ? '#FF5757' : '#fff' }}>{fmtDec(todaySpent)}</span>
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>de {fmt(fixed)}</span>
-              <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 100, background: todayRemaining >= 0 ? 'rgba(74,230,164,0.08)' : 'rgba(255,87,87,0.08)', color: todayRemaining >= 0 ? '#4AE6A4' : '#FF5757' }}>
-                {todayRemaining >= 0 ? `quedan ${fmt(todayRemaining)}` : `pasado ${fmt(-todayRemaining)}`}
-              </span>
+          {/* Small pill: fixed budget + delta info */}
+          <div style={styles.infoPill}>
+            <div style={styles.infoRow}>
+              <span style={styles.infoLabel}>Ppto. diario</span>
+              <span style={styles.infoVal}>{fmt(fixed)}</span>
+            </div>
+            {hasDelta && (
+              <div style={styles.infoRow}>
+                <span style={styles.infoLabel}>Ajuste de ayer</span>
+                <span style={{ ...styles.infoVal, color: deltaPositive ? '#4AE6A4' : '#FF5757' }}>
+                  {deltaPositive ? '+' : ''}{fmt(delta)}
+                </span>
+              </div>
+            )}
+            <div style={styles.infoRow}>
+              <span style={styles.infoLabel}>Gastado hoy</span>
+              <span style={{ ...styles.infoVal, color: '#FFB547' }}>-{fmtDec(todaySpent)}</span>
             </div>
           </div>
+        </div>
+
+        {/* Today progress bar */}
+        <div style={{ marginBottom: 18 }}>
           <div style={styles.progressTrack}>
-            <div style={{ ...styles.progressFill, width: `${todayPct}%`, background: todayPct > 90 ? '#FF5757' : todayPct > 70 ? '#FFB547' : '#4AE6A4' }} />
+            <div style={{
+              ...styles.progressFill,
+              width: `${todayPct}%`,
+              background: todayPct > 90 ? '#FF5757' : todayPct > 70 ? '#FFB547' : '#4AE6A4'
+            }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>
+            <span>{todayPct.toFixed(0)}% usado hoy</span>
+            {todayLeft < 0
+              ? <span style={{ color: '#FF5757' }}>Pasado por {fmt(-todayLeft)}</span>
+              : <span>Quedan {fmt(todayLeft)}</span>
+            }
           </div>
         </div>
 
@@ -135,15 +154,15 @@ const styles = {
   badge: { display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 500, padding: '5px 12px', borderRadius: 100 },
   dayBadge: { fontSize: 12, color: 'rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.05)', padding: '5px 12px', borderRadius: 100 },
   label: { fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 6, fontWeight: 500 },
-  amountRow: { display: 'flex', alignItems: 'flex-end', gap: 12, marginBottom: 20, flexWrap: 'wrap' },
-  amount: { fontFamily: 'var(--font-display)', fontSize: 60, lineHeight: 1, color: '#fff', letterSpacing: -2 },
-  currency: { fontSize: 15, color: 'rgba(255,255,255,0.25)', marginBottom: 4 },
-  adjustedPill: { display: 'flex', flexDirection: 'column', gap: 2, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '8px 12px', marginBottom: 4 },
-  todaySection: { marginBottom: 18 },
-  todayHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 },
-  todayLabel: { fontSize: 12, color: 'rgba(255,255,255,0.35)' },
-  progressTrack: { height: 4, background: 'rgba(255,255,255,0.07)', borderRadius: 2, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 2, transition: 'width 0.5s ease' },
+  amountRow: { display: 'flex', alignItems: 'flex-end', gap: 12, marginBottom: 18, flexWrap: 'wrap' },
+  amount: { fontFamily: 'var(--font-display)', fontSize: 64, lineHeight: 1, letterSpacing: -2, transition: 'color 0.3s' },
+  currency: { fontSize: 15, color: 'rgba(255,255,255,0.25)', marginBottom: 6 },
+  infoPill: { display: 'flex', flexDirection: 'column', gap: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '10px 14px', marginBottom: 4 },
+  infoRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 },
+  infoLabel: { fontSize: 11, color: 'rgba(255,255,255,0.3)' },
+  infoVal: { fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#fff' },
+  progressTrack: { height: 5, background: 'rgba(255,255,255,0.07)', borderRadius: 3, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 3, transition: 'width 0.4s ease' },
   substats: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, marginBottom: 14 },
   smartRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '10px 14px' },
 }
