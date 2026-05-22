@@ -1,4 +1,3 @@
-
 import { getDailyBudget, getRemaining, getTotalSpent, getRemainingDays, getTodaySpent, getDaysElapsed, getTripDays, fmt, fmtDec } from '../lib/budget'
 
 export default function Hero({ expenses, config }) {
