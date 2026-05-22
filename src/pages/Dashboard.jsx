@@ -7,10 +7,27 @@ import AddExpenseForm from '../components/AddExpenseForm'
 import CategoryChart from '../components/CategoryChart'
 import CityBreakdown from '../components/CityBreakdown'
 import ExpenseList from '../components/ExpenseList'
+import BudgetConfig from '../components/BudgetConfig'
+import { TRIP } from '../lib/budget'
+
+const DEFAULT_CONFIG = {
+  totalBudget: 3500,
+  totalUsable: TRIP.totalUsable,
+  prepaid: { ...TRIP.prepaid },
+}
+
+function loadConfig() {
+  try {
+    const saved = localStorage.getItem('tripflow-config')
+    if (saved) return JSON.parse(saved)
+  } catch {}
+  return DEFAULT_CONFIG
+}
 
 export default function Dashboard() {
   const [expenses, setExpenses] = useState([])
   const [loading, setLoading] = useState(true)
+  const [config, setConfig] = useState(loadConfig)
 
   const loadExpenses = useCallback(async () => {
     const { data } = await supabase
@@ -23,6 +40,13 @@ export default function Dashboard() {
   }, [])
 
   useEffect(() => { loadExpenses() }, [loadExpenses])
+
+  function handleSaveConfig(newConfig) {
+    const totalPrepaid = newConfig.prepaid.flights + newConfig.prepaid.parks + newConfig.prepaid.hotel
+    const updated = { ...newConfig, totalUsable: Math.max(newConfig.totalBudget - totalPrepaid, 0) }
+    setConfig(updated)
+    localStorage.setItem('tripflow-config', JSON.stringify(updated))
+  }
 
   async function handleAdd(expense) {
     const { data } = await supabase
@@ -58,9 +82,14 @@ export default function Dashboard() {
       </nav>
 
       <main style={styles.main}>
-        <div className="fade-up"><Hero expenses={expenses} /></div>
-        <div className="fade-up-2"><PrepaidCard /></div>
-        <div className="fade-up-3"><StatsBar expenses={expenses} /></div>
+        <div className="fade-up"><Hero expenses={expenses} config={config} /></div>
+
+        <div className="fade-up-2">
+          <BudgetConfig config={config} onSave={handleSaveConfig} />
+        </div>
+
+        <div className="fade-up-2"><PrepaidCard config={config} /></div>
+        <div className="fade-up-3"><StatsBar expenses={expenses} config={config} /></div>
 
         <div style={styles.sectionLabel}>Agregar gasto</div>
         <div className="fade-up-4"><AddExpenseForm onAdd={handleAdd} /></div>
