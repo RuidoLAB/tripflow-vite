@@ -1,11 +1,11 @@
-import { getTodaySpent, getDailyBudget, getTotalSpent, fmt, TRIP } from '../lib/budget'
+import { getTodaySpent, getDailyBudget, getTotalSpent, fmt } from '../lib/budget'
 
-export default function StatsBar({ expenses }) {
+export default function StatsBar({ expenses, config }) {
   const todaySpent = getTodaySpent(expenses)
-  const daily = getDailyBudget(expenses)
+  const daily = getDailyBudget(expenses, config)
   const totalSpent = getTotalSpent(expenses)
   const todayPct = Math.min((todaySpent / daily) * 100, 100) || 0
-  const totalPct = Math.min((totalSpent / TRIP.totalUsable) * 100, 100)
+  const totalPct = Math.min((totalSpent / config.totalUsable) * 100, 100)
 
   return (
     <div style={styles.grid}>
