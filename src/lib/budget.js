@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, parseISO, isAfter, isBefore, startOfDay, format } from 'date-fns'
+import { differenceInCalendarDays, parseISO, isAfter, isBefore, startOfDay, format, subDays } from 'date-fns'
 
 export const TRIP = {
   start: '2025-07-24',
@@ -26,27 +26,11 @@ export const CATEGORIES = [
 ]
 
 export const CITIES = ['Orlando', 'New York City', 'Los Angeles', 'General']
+export const CITY_BUDGETS = { Orlando: 450, 'New York City': 400, 'Los Angeles': 600, General: null }
+export const CITY_COLORS = { Orlando: '#60AAFF', 'New York City': '#4AE6A4', 'Los Angeles': '#FFB547', General: '#94A3B8' }
 
-export const CITY_BUDGETS = {
-  Orlando: 450,
-  'New York City': 400,
-  'Los Angeles': 600,
-  General: null,
-}
-
-export const CITY_COLORS = {
-  Orlando: '#60AAFF',
-  'New York City': '#4AE6A4',
-  'Los Angeles': '#FFB547',
-  General: '#94A3B8',
-}
-
-export function getCategoryColor(value) {
-  return CATEGORIES.find(c => c.value === value)?.color || '#94A3B8'
-}
-export function getCategoryLabel(value) {
-  return CATEGORIES.find(c => c.value === value)?.label || value
-}
+export function getCategoryColor(v) { return CATEGORIES.find(c => c.value === v)?.color || '#94A3B8' }
+export function getCategoryLabel(v) { return CATEGORIES.find(c => c.value === v)?.label || v }
 
 export function getTripDays() {
   return differenceInCalendarDays(parseISO(TRIP.end), parseISO(TRIP.start)) + 1
@@ -77,12 +61,45 @@ export function getTotalSpent(expenses) {
   return getUsable(expenses).reduce((s, e) => s + Number(e.amount), 0)
 }
 
+// Fixed daily budget: (total - prepaid) / trip days — never changes
+export function getFixedDailyBudget(config) {
+  const totalUsable = config?.totalUsable ?? TRIP.totalUsable
+  return totalUsable / getTripDays()
+}
+
+// What was spent on a specific date
+export function getSpentOnDate(expenses, dateStr) {
+  return getUsable(expenses)
+    .filter(e => e.date === dateStr)
+    .reduce((s, e) => s + Number(e.amount), 0)
+}
+
+// Yesterday's surplus or deficit vs the fixed daily budget
+export function getYesterdayDelta(expenses, config) {
+  const today = startOfDay(new Date())
+  const start = parseISO(TRIP.start)
+  if (!isAfter(today, start)) return 0 // first day, no yesterday
+  const yesterday = format(subDays(today, 1), 'yyyy-MM-dd')
+  const spent = getSpentOnDate(expenses, yesterday)
+  const fixed = getFixedDailyBudget(config)
+  return fixed - spent // positive = saved, negative = overspent
+}
+
+// Today's adjusted budget = fixed + yesterday's delta
+export function getTodayAdjustedBudget(expenses, config) {
+  const fixed = getFixedDailyBudget(config)
+  const delta = getYesterdayDelta(expenses, config)
+  return fixed + delta
+}
+
+// Remaining total budget
 export function getRemaining(expenses, config) {
   const usable = config?.totalUsable ?? TRIP.totalUsable
   return usable - getTotalSpent(expenses)
 }
 
-export function getDailyBudget(expenses, config) {
+// Smart recommended daily budget = remaining / remaining days
+export function getSmartDailyBudget(expenses, config) {
   const days = getRemainingDays()
   if (days <= 0) return 0
   return getRemaining(expenses, config) / days
@@ -90,16 +107,12 @@ export function getDailyBudget(expenses, config) {
 
 export function getTodaySpent(expenses) {
   const today = format(new Date(), 'yyyy-MM-dd')
-  return getUsable(expenses)
-    .filter(e => e.date === today)
-    .reduce((s, e) => s + Number(e.amount), 0)
+  return getSpentOnDate(expenses, today)
 }
 
 export function getByCategory(expenses) {
   const map = {}
-  getUsable(expenses).forEach(e => {
-    map[e.category] = (map[e.category] || 0) + Number(e.amount)
-  })
+  getUsable(expenses).forEach(e => { map[e.category] = (map[e.category] || 0) + Number(e.amount) })
   return Object.entries(map)
     .map(([key, value]) => ({ key, label: getCategoryLabel(key), value, color: getCategoryColor(key) }))
     .sort((a, b) => b.value - a.value)
@@ -107,15 +120,9 @@ export function getByCategory(expenses) {
 
 export function getByCity(expenses) {
   const map = {}
-  getUsable(expenses).forEach(e => {
-    map[e.city] = (map[e.city] || 0) + Number(e.amount)
-  })
+  getUsable(expenses).forEach(e => { map[e.city] = (map[e.city] || 0) + Number(e.amount) })
   return Object.entries(map)
-    .map(([city, spent]) => ({
-      city, spent,
-      budget: CITY_BUDGETS[city] || null,
-      color: CITY_COLORS[city] || '#94A3B8',
-    }))
+    .map(([city, spent]) => ({ city, spent, budget: CITY_BUDGETS[city] || null, color: CITY_COLORS[city] || '#94A3B8' }))
     .sort((a, b) => b.spent - a.spent)
 }
 
