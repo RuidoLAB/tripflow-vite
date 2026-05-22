@@ -1,7 +1,7 @@
-import { TRIP, fmt } from '../lib/budget'
+import { fmt } from '../lib/budget'
 
-export default function PrepaidCard() {
-  const total = TRIP.prepaid.flights + TRIP.prepaid.parks + TRIP.prepaid.hotel
+export default function PrepaidCard({ config }) {
+  const total = config.prepaid.flights + config.prepaid.parks + config.prepaid.hotel
   return (
     <div style={styles.card}>
       <div style={styles.header}>
@@ -9,9 +9,9 @@ export default function PrepaidCard() {
         <span style={styles.total}>{fmt(total)} total</span>
       </div>
       <div style={styles.grid}>
-        <Item icon="✈" label="Vuelos" amount={TRIP.prepaid.flights} bg="rgba(167,139,250,0.1)" color="#A78BFA" />
-        <Item icon="🏰" label="Parques" amount={TRIP.prepaid.parks} bg="rgba(244,114,182,0.1)" color="#F472B6" />
-        <Item icon="🏨" label="Hotel" amount={TRIP.prepaid.hotel} bg="rgba(251,146,60,0.1)" color="#FB923C" />
+        <Item icon="✈" label="Vuelos" amount={config.prepaid.flights} bg="rgba(167,139,250,0.1)" color="#A78BFA" />
+        <Item icon="🏰" label="Parques" amount={config.prepaid.parks} bg="rgba(244,114,182,0.1)" color="#F472B6" />
+        <Item icon="🏨" label="Hotel" amount={config.prepaid.hotel} bg="rgba(251,146,60,0.1)" color="#FB923C" />
       </div>
       <p style={styles.note}>Estos gastos no afectan el presupuesto diario ni el saldo disponible.</p>
     </div>
