@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '../lib/supabase'
-import { useAuth } from '../hooks/useAuth'
+import { supabase, USER_ID } from '../lib/supabase'
 import Hero from '../components/Hero'
 import PrepaidCard from '../components/PrepaidCard'
 import StatsBar from '../components/StatsBar'
@@ -10,7 +9,6 @@ import CityBreakdown from '../components/CityBreakdown'
 import ExpenseList from '../components/ExpenseList'
 
 export default function Dashboard() {
-  const { user } = useAuth()
   const [expenses, setExpenses] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -18,18 +16,18 @@ export default function Dashboard() {
     const { data } = await supabase
       .from('expenses')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', USER_ID)
       .order('created_at', { ascending: false })
     setExpenses(data || [])
     setLoading(false)
-  }, [user.id])
+  }, [])
 
   useEffect(() => { loadExpenses() }, [loadExpenses])
 
   async function handleAdd(expense) {
     const { data } = await supabase
       .from('expenses')
-      .insert({ ...expense, user_id: user.id })
+      .insert({ ...expense, user_id: USER_ID })
       .select()
       .single()
     if (data) setExpenses(prev => [data, ...prev])
@@ -38,10 +36,6 @@ export default function Dashboard() {
   async function handleDelete(id) {
     await supabase.from('expenses').delete().eq('id', id)
     setExpenses(prev => prev.filter(e => e.id !== id))
-  }
-
-  async function handleSignOut() {
-    await supabase.auth.signOut()
   }
 
   if (loading) return (
@@ -55,16 +49,12 @@ export default function Dashboard() {
     <div style={{ minHeight: '100vh', background: '#080A0F', position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'fixed', top: 0, left: '50%', transform: 'translateX(-50%)', width: 600, height: 300, background: 'rgba(74,230,164,0.04)', borderRadius: '50%', filter: 'blur(60px)', pointerEvents: 'none', zIndex: 0 }} />
 
-      {/* Nav */}
       <nav style={styles.nav}>
         <div style={styles.navLogo}>
           <div style={styles.navIcon}>✈</div>
           <span style={styles.navTitle}>TripFlow</span>
         </div>
-        <div style={styles.navRight}>
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>{user.email}</span>
-          <button onClick={handleSignOut} style={styles.signOutBtn}>Salir</button>
-        </div>
+        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>EE.UU. · Jul–Ago 2025</span>
       </nav>
 
       <main style={styles.main}>
@@ -92,8 +82,6 @@ const styles = {
   navLogo: { display: 'flex', alignItems: 'center', gap: 10 },
   navIcon: { width: 28, height: 28, borderRadius: 8, background: 'rgba(74,230,164,0.1)', border: '1px solid rgba(74,230,164,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 },
   navTitle: { fontFamily: 'var(--font-display)', fontSize: 18, color: '#fff' },
-  navRight: { display: 'flex', alignItems: 'center', gap: 14 },
-  signOutBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 13, cursor: 'pointer' },
   main: { maxWidth: 640, margin: '0 auto', padding: '20px 16px 60px', position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: 12 },
   sectionLabel: { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)', marginTop: 12, marginBottom: -4 },
   chartsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginTop: 8 },
