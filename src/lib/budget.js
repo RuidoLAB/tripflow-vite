@@ -125,3 +125,15 @@ export function fmt(amount) {
 export function fmtDec(amount) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)
 }
+
+// Config-aware versions
+export function getRemaining(expenses, config) {
+  const usable = config?.totalUsable ?? TRIP.totalUsable
+  return usable - getTotalSpent(expenses)
+}
+
+export function getDailyBudget(expenses, config) {
+  const days = getRemainingDays()
+  if (days <= 0) return 0
+  return getRemaining(expenses, config) / days
+}
