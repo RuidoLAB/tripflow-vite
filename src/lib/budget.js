@@ -77,14 +77,15 @@ export function getTotalSpent(expenses) {
   return getUsable(expenses).reduce((s, e) => s + Number(e.amount), 0)
 }
 
-export function getRemaining(expenses) {
-  return TRIP.totalUsable - getTotalSpent(expenses)
+export function getRemaining(expenses, config) {
+  const usable = config?.totalUsable ?? TRIP.totalUsable
+  return usable - getTotalSpent(expenses)
 }
 
-export function getDailyBudget(expenses) {
+export function getDailyBudget(expenses, config) {
   const days = getRemainingDays()
   if (days <= 0) return 0
-  return getRemaining(expenses) / days
+  return getRemaining(expenses, config) / days
 }
 
 export function getTodaySpent(expenses) {
@@ -124,16 +125,4 @@ export function fmt(amount) {
 
 export function fmtDec(amount) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)
-}
-
-// Config-aware versions
-export function getRemaining(expenses, config) {
-  const usable = config?.totalUsable ?? TRIP.totalUsable
-  return usable - getTotalSpent(expenses)
-}
-
-export function getDailyBudget(expenses, config) {
-  const days = getRemainingDays()
-  if (days <= 0) return 0
-  return getRemaining(expenses, config) / days
 }
