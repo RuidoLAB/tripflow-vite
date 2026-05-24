@@ -1,7 +1,15 @@
 import { getByCity, fmt } from '../lib/budget'
 
-export default function CityBreakdown({ expenses }) {
+const DEFAULT_CITY_BUDGETS = {
+  Orlando: 450,
+  'New York City': 400,
+  'Los Angeles': 600,
+  General: 0,
+}
+
+export default function CityBreakdown({ expenses, config }) {
   const data = getByCity(expenses)
+  const cityBudgets = config?.cityBudgets || DEFAULT_CITY_BUDGETS
 
   return (
     <div style={styles.card}>
@@ -10,7 +18,8 @@ export default function CityBreakdown({ expenses }) {
         <div style={styles.empty}>Sin datos aún</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {data.map(({ city, spent, budget, color }) => {
+          {data.map(({ city, spent, color }) => {
+            const budget = cityBudgets[city] || null
             const pct = budget ? Math.min((spent / budget) * 100, 100) : null
             const isOver = budget && spent > budget
             return (
@@ -23,10 +32,10 @@ export default function CityBreakdown({ expenses }) {
                   </div>
                   <div style={styles.cityAmt}>
                     <span style={{ color: '#fff', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{fmt(spent)}</span>
-                    {budget && <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 11 }}> / {fmt(budget)}</span>}
+                    {budget > 0 && <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 11 }}> / {fmt(budget)}</span>}
                   </div>
                 </div>
-                {pct !== null && (
+                {pct !== null && budget > 0 && (
                   <div style={styles.track}>
                     <div style={{ ...styles.fill, width: `${pct}%`, background: isOver ? '#FF5757' : color }} />
                   </div>
