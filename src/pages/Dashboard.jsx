@@ -17,6 +17,7 @@ function tripToConfig(trip) {
     totalDays: trip.total_days || 16,
     timezone: trip.timezone || 'America/New_York',
     startDate: trip.start_date || null,
+    cityBudgets: trip.city_budgets || null,
     prepaid: {
       flights: Number(trip.prepaid_flights) || 0,
       parks: Number(trip.prepaid_parks) || 0,
@@ -57,6 +58,7 @@ export default function Dashboard() {
       prepaid_flights: newConfig.prepaid.flights,
       prepaid_parks: newConfig.prepaid.parks,
       prepaid_hotel: newConfig.prepaid.hotel,
+      city_budgets: newConfig.cityBudgets || null,
     }
     const { data } = await supabase.from('trips').update(updates).eq('id', id).select().single()
     if (data) setTrip(data)
@@ -111,7 +113,7 @@ export default function Dashboard() {
         <div style={styles.sectionLabel}>Desglose</div>
         <div style={styles.chartsGrid}>
           <CategoryChart expenses={expenses} />
-          <CityBreakdown expenses={expenses} />
+          <CityBreakdown expenses={expenses} config={config} />
         </div>
 
         <div style={styles.sectionLabel}>Gastos recientes</div>
