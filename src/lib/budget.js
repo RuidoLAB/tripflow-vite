@@ -6,8 +6,6 @@ export const TRIP = {
   prepaid: { flights: 1500, parks: 488, hotel: 500 },
 }
 
-export const PREPAID_CATEGORIES = ['vuelos', 'parques', 'hotel']
-
 export const TIMEZONES = [
   { value: 'America/New_York',    label: 'Eastern (ET) — Miami, Orlando, NYC' },
   { value: 'America/Chicago',     label: 'Central (CT)' },
@@ -38,14 +36,12 @@ export const CITY_COLORS = { Orlando: '#60AAFF', 'New York City': '#4AE6A4', 'Lo
 export function getCategoryColor(v) { return CATEGORIES.find(c => c.value === v)?.color || '#94A3B8' }
 export function getCategoryLabel(v) { return CATEGORIES.find(c => c.value === v)?.label || v }
 
-// Get current date string in the configured timezone (YYYY-MM-DD)
 export function getTodayStr(config) {
   const tz = config?.timezone || 'America/New_York'
   const now = toZonedTime(new Date(), tz)
   return format(now, 'yyyy-MM-dd')
 }
 
-// Get yesterday's date string in configured timezone
 export function getYesterdayStr(config) {
   const tz = config?.timezone || 'America/New_York'
   const now = toZonedTime(new Date(), tz)
@@ -53,75 +49,74 @@ export function getYesterdayStr(config) {
   return format(now, 'yyyy-MM-dd')
 }
 
-// Trip days elapsed and remaining based on startDate + totalDays
 export function getTripInfo(config) {
   if (!config?.startDate || !config?.totalDays) {
     return { started: false, ended: false, dayNumber: 0, daysElapsed: 0, remainingDays: config?.totalDays || 16, totalDays: config?.totalDays || 16 }
   }
-
   const tz = config.timezone || 'America/New_York'
   const now = toZonedTime(new Date(), tz)
   const start = toZonedTime(new Date(config.startDate), tz)
   const totalDays = config.totalDays
-
-  // Reset to midnight for day comparison
   const nowDay = new Date(format(now, 'yyyy-MM-dd'))
   const startDay = new Date(format(start, 'yyyy-MM-dd'))
-
   const daysElapsed = Math.floor((nowDay - startDay) / (1000 * 60 * 60 * 24))
-
   if (daysElapsed < 0) return { started: false, ended: false, dayNumber: 0, daysElapsed: 0, remainingDays: totalDays, totalDays }
   if (daysElapsed >= totalDays) return { started: true, ended: true, dayNumber: totalDays, daysElapsed: totalDays, remainingDays: 0, totalDays }
-
-  return {
-    started: true,
-    ended: false,
-    dayNumber: daysElapsed + 1,
-    daysElapsed,
-    remainingDays: totalDays - daysElapsed,
-    totalDays,
-  }
+  return { started: true, ended: false, dayNumber: daysElapsed + 1, daysElapsed, remainingDays: totalDays - daysElapsed, totalDays }
 }
 
-export function isUsable(expense) {
-  return !expense.prepaid && !PREPAID_CATEGORIES.includes(expense.category)
+// ─── Expense classification ───────────────────────────────────────────────────
+
+// ALL expenses (daily + outside daily) — used for total spent & analytics
+export function getAllExpenses(expenses) {
+  return expenses
 }
 
-export function getUsable(expenses) {
-  return expenses.filter(isUsable)
+// Only expenses that affect the daily budget calculation
+export function getDailyExpenses(expenses) {
+  return expenses.filter(e => !e.prepaid)
 }
 
+// Expenses outside daily budget (prepaid=true) — still count toward total
+export function getOutsideDailyExpenses(expenses) {
+  return expenses.filter(e => e.prepaid)
+}
+
+// ─── Totals ───────────────────────────────────────────────────────────────────
+
+// Total spent = ALL expenses (daily + outside daily)
 export function getTotalSpent(expenses) {
-  return getUsable(expenses).reduce((s, e) => s + Number(e.amount), 0)
+  return expenses.reduce((s, e) => s + Number(e.amount), 0)
 }
 
+// Total remaining from the full usable budget
 export function getRemaining(expenses, config) {
   const usable = config?.totalUsable ?? TRIP.totalUsable
   return usable - getTotalSpent(expenses)
 }
 
-// Fixed daily budget: totalUsable / totalDays — never changes
+// Fixed daily budget = totalUsable / totalDays (never changes)
 export function getFixedDailyBudget(config) {
   const usable = config?.totalUsable ?? TRIP.totalUsable
   const days = config?.totalDays || 16
   return usable / days
 }
 
-// Smart recommended: remaining / remaining days
+// Smart recommended = remaining / remaining days
 export function getSmartDailyBudget(expenses, config) {
   const { remainingDays } = getTripInfo(config)
   if (remainingDays <= 0) return 0
   return getRemaining(expenses, config) / remainingDays
 }
 
-// Spent on a specific date string
+// Spent on a date — only daily expenses (exclude outside-daily)
 export function getSpentOnDate(expenses, dateStr) {
-  return getUsable(expenses)
+  return getDailyExpenses(expenses)
     .filter(e => e.date === dateStr)
     .reduce((s, e) => s + Number(e.amount), 0)
 }
 
-// Yesterday's delta vs fixed budget
+// Yesterday's delta vs fixed budget (only daily expenses)
 export function getYesterdayDelta(expenses, config) {
   const { started, dayNumber } = getTripInfo(config)
   if (!started || dayNumber <= 1) return 0
@@ -136,14 +131,17 @@ export function getTodayAdjustedBudget(expenses, config) {
   return getFixedDailyBudget(config) + getYesterdayDelta(expenses, config)
 }
 
+// Today spent — only daily expenses
 export function getTodaySpent(expenses, config) {
   const today = getTodayStr(config)
   return getSpentOnDate(expenses, today)
 }
 
+// ─── Analytics (all expenses) ─────────────────────────────────────────────────
+
 export function getByCategory(expenses) {
   const map = {}
-  getUsable(expenses).forEach(e => { map[e.category] = (map[e.category] || 0) + Number(e.amount) })
+  expenses.forEach(e => { map[e.category] = (map[e.category] || 0) + Number(e.amount) })
   return Object.entries(map)
     .map(([key, value]) => ({ key, label: getCategoryLabel(key), value, color: getCategoryColor(key) }))
     .sort((a, b) => b.value - a.value)
@@ -151,7 +149,7 @@ export function getByCategory(expenses) {
 
 export function getByCity(expenses) {
   const map = {}
-  getUsable(expenses).forEach(e => { map[e.city] = (map[e.city] || 0) + Number(e.amount) })
+  expenses.forEach(e => { map[e.city] = (map[e.city] || 0) + Number(e.amount) })
   return Object.entries(map)
     .map(([city, spent]) => ({ city, spent, budget: CITY_BUDGETS[city] || null, color: CITY_COLORS[city] || '#94A3B8' }))
     .sort((a, b) => b.spent - a.spent)
