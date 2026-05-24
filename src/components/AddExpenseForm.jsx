@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { CATEGORIES, CITIES } from '../lib/budget'
 import { format } from 'date-fns'
- 
+
 export default function AddExpenseForm({ onAdd }) {
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('comida')
   const [description, setDescription] = useState('')
   const [city, setCity] = useState('General')
-  const [prepaid, setPrepaid] = useState(false)
+  const [outsideDaily, setOutsideDaily] = useState(false)
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [loading, setLoading] = useState(false)
 
@@ -15,17 +15,39 @@ export default function AddExpenseForm({ onAdd }) {
     e.preventDefault()
     if (!amount || isNaN(parseFloat(amount))) return
     setLoading(true)
-    await onAdd({ amount: parseFloat(amount), category, description, city, prepaid, date })
+    await onAdd({
+      amount: parseFloat(amount),
+      category,
+      description,
+      city,
+      prepaid: outsideDaily, // reusing the prepaid field for outside-daily
+      date,
+    })
     setAmount('')
     setDescription('')
-    setPrepaid(false)
+    setOutsideDaily(false)
     setLoading(false)
   }
 
   return (
     <form onSubmit={handleSubmit} style={styles.card}>
-      <input type="number" step="0.01" min="0" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} style={styles.amountInput} required />
-      <input type="text" placeholder="Descripción (opcional)" value={description} onChange={e => setDescription(e.target.value)} maxLength={100} />
+      <input
+        type="number"
+        step="0.01"
+        min="0"
+        placeholder="0.00"
+        value={amount}
+        onChange={e => setAmount(e.target.value)}
+        style={styles.amountInput}
+        required
+      />
+      <input
+        type="text"
+        placeholder="Descripción (opcional)"
+        value={description}
+        onChange={e => setDescription(e.target.value)}
+        maxLength={100}
+      />
 
       <div style={styles.row}>
         <div style={{ flex: 1 }}>
@@ -47,15 +69,24 @@ export default function AddExpenseForm({ onAdd }) {
         <input type="date" value={date} onChange={e => setDate(e.target.value)} />
       </div>
 
-      <div style={styles.toggleRow} onClick={() => setPrepaid(!prepaid)}>
+      <div style={styles.toggleRow} onClick={() => setOutsideDaily(!outsideDaily)}>
         <div>
-          <div style={styles.toggleTitle}>Pagado antes del viaje</div>
-          <div style={styles.toggleSub}>No afecta el presupuesto diario</div>
+          <div style={styles.toggleTitle}>Fuera del presupuesto diario</div>
+          <div style={styles.toggleSub}>
+            Se descuenta del total pero no afecta el cálculo del día
+          </div>
         </div>
-        <div style={{ ...styles.track, background: prepaid ? '#4AE6A4' : 'rgba(255,255,255,0.1)' }}>
-          <div style={{ ...styles.thumb, left: prepaid ? 22 : 3 }} />
+        <div style={{ ...styles.track, background: outsideDaily ? '#4AE6A4' : 'rgba(255,255,255,0.1)' }}>
+          <div style={{ ...styles.thumb, left: outsideDaily ? 22 : 3 }} />
         </div>
       </div>
+
+      {outsideDaily && (
+        <div style={styles.outsideNote}>
+          <span style={{ fontSize: 16 }}>💡</span>
+          <span>Este gasto bajará tu presupuesto total restante y aparecerá en los gráficos, pero no afectará el presupuesto disponible de hoy ni el carry-over diario.</span>
+        </div>
+      )}
 
       <button type="submit" className="btn-primary" disabled={loading || !amount}>
         {loading ? <span className="spinner" /> : <><span>+</span> Agregar gasto</>}
@@ -70,8 +101,9 @@ const styles = {
   row: { display: 'flex', gap: 12 },
   label: { fontSize: 11, color: 'rgba(255,255,255,0.3)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' },
   toggleRow: { background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' },
-  toggleTitle: { fontSize: 13, color: 'rgba(255,255,255,0.6)' },
+  toggleTitle: { fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: 500 },
   toggleSub: { fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 2 },
   track: { width: 40, height: 22, borderRadius: 100, position: 'relative', transition: 'background 0.2s', flexShrink: 0 },
   thumb: { width: 16, height: 16, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, transition: 'left 0.2s' },
+  outsideNote: { display: 'flex', gap: 10, alignItems: 'flex-start', background: 'rgba(74,230,164,0.06)', border: '1px solid rgba(74,230,164,0.15)', borderRadius: 12, padding: '10px 14px', fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 },
 }
