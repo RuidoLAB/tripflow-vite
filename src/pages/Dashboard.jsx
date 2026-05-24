@@ -18,6 +18,7 @@ function tripToConfig(trip) {
     timezone: trip.timezone || 'America/New_York',
     startDate: trip.start_date || null,
     cityBudgets: trip.city_budgets || null,
+    cities: trip.cities || [],
     prepaid: {
       flights: Number(trip.prepaid_flights) || 0,
       parks: Number(trip.prepaid_parks) || 0,
