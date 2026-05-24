@@ -1,39 +1,24 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { format, parseISO } from 'date-fns'
-import { es } from 'date-fns/locale'
+import CreateTripWizard from '../components/CreateTripWizard'
 
 export default function Trips() {
   const [trips, setTrips] = useState([])
   const [loading, setLoading] = useState(true)
-  const [creating, setCreating] = useState(false)
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ name: '', description: '' })
+  const [showWizard, setShowWizard] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => { loadTrips() }, [])
 
   async function loadTrips() {
-    const { data } = await supabase
-      .from('trips')
-      .select('*')
-      .order('created_at', { ascending: false })
+    const { data } = await supabase.from('trips').select('*').order('created_at', { ascending: false })
     setTrips(data || [])
     setLoading(false)
   }
 
-  async function handleCreate(e) {
-    e.preventDefault()
-    if (!form.name.trim()) return
-    setCreating(true)
-    const { data } = await supabase
-      .from('trips')
-      .insert({ name: form.name.trim(), description: form.description.trim() })
-      .select()
-      .single()
-    if (data) navigate(`/trip/${data.id}`)
-    setCreating(false)
+  function handleCreated(trip) {
+    navigate(`/trip/${trip.id}`)
   }
 
   async function handleDelete(id, e) {
@@ -54,13 +39,26 @@ export default function Trips() {
     return { label: `En curso · Día ${dayNum}`, color: '#4AE6A4' }
   }
 
+  function getCityNames(trip) {
+    if (trip.cities && trip.cities.length > 0) {
+      return trip.cities.map(c => c.name).join(' · ')
+    }
+    return null
+  }
+
   return (
     <div style={styles.page}>
       <div style={styles.orb1} />
       <div style={styles.orb2} />
 
+      {showWizard && (
+        <CreateTripWizard
+          onClose={() => setShowWizard(false)}
+          onCreated={handleCreated}
+        />
+      )}
+
       <div style={styles.container}>
-        {/* Header */}
         <div style={styles.header}>
           <div style={styles.logo}>
             <div style={styles.logoIcon}>✈</div>
@@ -69,43 +67,11 @@ export default function Trips() {
           <p style={styles.logoSub}>Tu tracker de viajes</p>
         </div>
 
-        {/* New trip button / form */}
-        {!showForm ? (
-          <button onClick={() => setShowForm(true)} style={styles.newBtn} className="fade-up">
-            <span style={styles.newBtnPlus}>+</span>
-            <span>Nuevo viaje</span>
-          </button>
-        ) : (
-          <form onSubmit={handleCreate} style={styles.form} className="fade-up">
-            <div style={styles.formTitle}>Nuevo viaje</div>
-            <input
-              type="text"
-              placeholder="Nombre del viaje (ej: EE.UU. 2025)"
-              value={form.name}
-              onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-              autoFocus
-              required
-              maxLength={60}
-            />
-            <input
-              type="text"
-              placeholder="Descripción (opcional)"
-              value={form.description}
-              onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-              maxLength={100}
-            />
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button type="submit" className="btn-primary" disabled={creating} style={{ flex: 1 }}>
-                {creating ? <span className="spinner" /> : 'Crear viaje'}
-              </button>
-              <button type="button" onClick={() => setShowForm(false)} style={styles.cancelBtn}>
-                Cancelar
-              </button>
-            </div>
-          </form>
-        )}
+        <button onClick={() => setShowWizard(true)} style={styles.newBtn} className="fade-up">
+          <span style={styles.newBtnPlus}>+</span>
+          <span>Nuevo viaje</span>
+        </button>
 
-        {/* Trips list */}
         {loading ? (
           <div style={styles.loadingWrap}>
             <div className="spinner" style={{ width: 24, height: 24, borderColor: 'rgba(74,230,164,0.2)', borderTopColor: '#4AE6A4' }} />
@@ -118,8 +84,9 @@ export default function Trips() {
           </div>
         ) : (
           <div style={styles.list}>
-            {trips.map((trip, i) => {
+            {trips.map(trip => {
               const status = getTripStatus(trip)
+              const cityNames = getCityNames(trip)
               return (
                 <div
                   key={trip.id}
@@ -131,28 +98,23 @@ export default function Trips() {
                 >
                   <div style={styles.tripLeft}>
                     <div style={styles.tripIcon}>
-                      {status.label === 'Finalizado' ? '🏁' : status.label === 'Próximo' ? '🗓️' : status.label === 'Sin iniciar' ? '✈️' : '🌎'}
+                      {status.label === 'Finalizado' ? '🏁' : status.label.includes('En curso') ? '🌎' : status.label === 'Próximo' ? '🗓️' : '✈️'}
                     </div>
-                    <div>
+                    <div style={{ minWidth: 0 }}>
                       <div style={styles.tripName}>{trip.name}</div>
-                      {trip.description && <div style={styles.tripDesc}>{trip.description}</div>}
+                      {cityNames && <div style={styles.tripCities}>{cityNames}</div>}
+                      {trip.description && !cityNames && <div style={styles.tripDesc}>{trip.description}</div>}
                       <div style={styles.tripMeta}>
                         <span style={{ ...styles.statusDot, background: status.color }} />
                         <span style={{ color: status.color, fontSize: 12 }}>{status.label}</span>
-                        {trip.total_days && <span style={styles.metaSep}>·</span>}
-                        {trip.total_days && <span style={styles.metaText}>{trip.total_days} días</span>}
-                        {trip.total_usable > 0 && <span style={styles.metaSep}>·</span>}
-                        {trip.total_usable > 0 && <span style={styles.metaText}>${Number(trip.total_usable).toLocaleString()} usable</span>}
+                        {trip.total_days && <><span style={styles.metaSep}>·</span><span style={styles.metaText}>{trip.total_days} días</span></>}
+                        {trip.total_usable > 0 && <><span style={styles.metaSep}>·</span><span style={styles.metaText}>${Number(trip.total_usable).toLocaleString()} usable</span></>}
                       </div>
                     </div>
                   </div>
                   <div style={styles.tripRight}>
                     <span style={styles.arrow}>›</span>
-                    <button
-                      onClick={e => handleDelete(trip.id, e)}
-                      style={styles.deleteBtn}
-                      title="Eliminar"
-                    >×</button>
+                    <button onClick={e => handleDelete(trip.id, e)} style={styles.deleteBtn}>×</button>
                   </div>
                 </div>
               )
@@ -174,11 +136,8 @@ const styles = {
   logoIcon: { width: 40, height: 40, borderRadius: 12, background: 'rgba(74,230,164,0.1)', border: '1px solid rgba(74,230,164,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 },
   logoTitle: { fontFamily: 'var(--font-display)', fontSize: 32, color: '#fff' },
   logoSub: { fontSize: 13, color: 'rgba(255,255,255,0.25)' },
-  newBtn: { width: '100%', background: 'rgba(74,230,164,0.08)', border: '1px dashed rgba(74,230,164,0.25)', borderRadius: 16, padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, color: '#4AE6A4', fontSize: 15, fontWeight: 600, cursor: 'pointer', marginBottom: 16, transition: 'all 0.2s' },
+  newBtn: { width: '100%', background: 'rgba(74,230,164,0.08)', border: '1px dashed rgba(74,230,164,0.25)', borderRadius: 16, padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, color: '#4AE6A4', fontSize: 15, fontWeight: 600, cursor: 'pointer', marginBottom: 16 },
   newBtnPlus: { fontSize: 22, lineHeight: 1, fontWeight: 300 },
-  form: { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: 20, display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 },
-  formTitle: { fontSize: 15, fontWeight: 600, color: '#fff', marginBottom: 4 },
-  cancelBtn: { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '12px 20px', color: 'rgba(255,255,255,0.5)', fontSize: 14, cursor: 'pointer' },
   loadingWrap: { display: 'flex', justifyContent: 'center', padding: 40 },
   empty: { textAlign: 'center', padding: '60px 20px' },
   list: { display: 'flex', flexDirection: 'column', gap: 10 },
@@ -186,12 +145,13 @@ const styles = {
   tripLeft: { display: 'flex', alignItems: 'center', gap: 14, flex: 1, minWidth: 0 },
   tripIcon: { width: 42, height: 42, borderRadius: 12, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 },
   tripName: { fontSize: 15, fontWeight: 600, color: '#fff', marginBottom: 2 },
-  tripDesc: { fontSize: 12, color: 'rgba(255,255,255,0.3)', marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 240 },
+  tripCities: { fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  tripDesc: { fontSize: 12, color: 'rgba(255,255,255,0.3)', marginBottom: 4 },
   tripMeta: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   statusDot: { width: 6, height: 6, borderRadius: '50%', flexShrink: 0 },
   metaSep: { color: 'rgba(255,255,255,0.15)', fontSize: 12 },
   metaText: { fontSize: 12, color: 'rgba(255,255,255,0.3)' },
   tripRight: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 },
   arrow: { fontSize: 22, color: 'rgba(255,255,255,0.2)' },
-  deleteBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.15)', fontSize: 20, cursor: 'pointer', padding: '0 4px', lineHeight: 1, transition: 'color 0.15s' },
+  deleteBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.15)', fontSize: 20, cursor: 'pointer', padding: '0 4px', lineHeight: 1 },
 }
