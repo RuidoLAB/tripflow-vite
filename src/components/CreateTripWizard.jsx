@@ -17,15 +17,18 @@ function StepIndicator({ current }) {
     <div style={si.wrap}>
       {STEPS.map((label, i) => (
         <div key={i} style={si.item}>
-          <div style={{
-            ...si.dot,
-            background: i < current ? '#4AE6A4' : i === current ? '#fff' : 'rgba(255,255,255,0.1)',
-            border: i === current ? '2px solid #4AE6A4' : 'none',
-          }}>
-            {i < current ? '✓' : i + 1}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            <div style={{
+              ...si.dot,
+              background: i < current ? '#4AE6A4' : i === current ? '#fff' : 'rgba(255,255,255,0.1)',
+              border: i === current ? '2px solid #4AE6A4' : 'none',
+              color: i < current ? '#080A0F' : i === current ? '#080A0F' : 'rgba(255,255,255,0.4)',
+            }}>
+              {i < current ? '✓' : i + 1}
+            </div>
+            <span style={{ ...si.label, color: i === current ? '#fff' : 'rgba(255,255,255,0.3)' }}>{label}</span>
           </div>
-          <span style={{ ...si.label, color: i === current ? '#fff' : 'rgba(255,255,255,0.3)' }}>{label}</span>
-          {i < STEPS.length - 1 && <div style={{ ...si.line, background: i < current ? '#4AE6A4' : 'rgba(255,255,255,0.1)' }} />}
+          {i < STEPS.length - 1 && <div style={{ ...si.line, background: i < current ? '#4AE6A4' : 'rgba(255,255,255,0.1)', marginBottom: 18 }} />}
         </div>
       ))}
     </div>
@@ -33,11 +36,11 @@ function StepIndicator({ current }) {
 }
 
 const si = {
-  wrap: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, marginBottom: 32 },
-  item: { display: 'flex', alignItems: 'center', gap: 6 },
-  dot: { width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, color: '#080A0F', flexShrink: 0 },
-  label: { fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap' },
-  line: { width: 24, height: 1, marginLeft: 6 },
+  wrap: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, marginBottom: 24, padding: '0 4px' },
+  item: { display: 'flex', alignItems: 'center', gap: 0 },
+  dot: { width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, flexShrink: 0 },
+  label: { fontSize: 10, fontWeight: 500, whiteSpace: 'nowrap', textAlign: 'center' },
+  line: { width: 16, height: 1, flexShrink: 0 },
 }
 
 // ── Step 1: Basic info ────────────────────────────────────────────────────────
@@ -92,7 +95,7 @@ function Step1({ data, onChange }) {
             type="datetime-local"
             value={data.startDate ? new Date(data.startDate).toISOString().slice(0, 16) : ''}
             onChange={e => onChange('startDate', e.target.value ? new Date(e.target.value).toISOString() : '')}
-            style={{ fontSize: 13, width: '100%' }}
+            style={{ fontSize: 13, width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}
           />
         </div>
         {data.startDate && (
@@ -507,8 +510,8 @@ const s = {
 }
 
 const w = {
-  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 },
-  modal: { background: '#0D1017', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 24, width: '100%', maxWidth: 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0' },
+  modal: { background: '#0D1017', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '24px 24px 0 0', width: '100%', maxWidth: 600, height: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   header: { display: 'flex', justifyContent: 'flex-end', padding: '16px 20px 0' },
   closeBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 24, cursor: 'pointer', lineHeight: 1 },
   content: { flex: 1, overflowY: 'auto', padding: '0 24px 24px' },
