@@ -1,19 +1,14 @@
 import { useState } from 'react'
-import { fmt, TIMEZONES, CITIES } from '../lib/budget'
-
-const DEFAULT_CITY_BUDGETS = {
-  Orlando: 450,
-  'New York City': 400,
-  'Los Angeles': 600,
-  General: 0,
-}
+import { fmt, TIMEZONES } from '../lib/budget'
 
 export default function BudgetConfig({ config, onSave }) {
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({
-    ...config,
-    cityBudgets: config.cityBudgets || DEFAULT_CITY_BUDGETS,
-  })
+  const [form, setForm] = useState(config)
+
+  // Get cities from trip config (set during wizard)
+  const tripCities = config.cities && config.cities.length > 0
+    ? config.cities
+    : []
 
   function handleChange(key, value) {
     setForm(prev => ({ ...prev, [key]: key === 'totalDays' ? parseInt(value) || 1 : parseFloat(value) || 0 }))
@@ -23,16 +18,18 @@ export default function BudgetConfig({ config, onSave }) {
     setForm(prev => ({ ...prev, prepaid: { ...prev.prepaid, [key]: parseFloat(value) || 0 } }))
   }
 
-  function handleCityBudget(city, value) {
-    setForm(prev => ({ ...prev, cityBudgets: { ...prev.cityBudgets, [city]: parseFloat(value) || 0 } }))
-  }
-
-  function handleStartNow() {
-    setForm(prev => ({ ...prev, startDate: new Date().toISOString() }))
+  function handleCityBudget(cityName, value) {
+    const updated = (form.cities || []).map(c =>
+      c.name === cityName ? { ...c, budget: parseFloat(value) || 0 } : c
+    )
+    setForm(prev => ({ ...prev, cities: updated }))
   }
 
   function handleSave() {
-    onSave(form)
+    // Rebuild cityBudgets from cities array
+    const cityBudgets = {}
+    ;(form.cities || []).forEach(c => { cityBudgets[c.name] = c.budget || 0 })
+    onSave({ ...form, cityBudgets })
     setOpen(false)
   }
 
@@ -71,7 +68,6 @@ export default function BudgetConfig({ config, onSave }) {
         <button onClick={() => setOpen(false)} style={styles.closeBtn}>×</button>
       </div>
 
-      {/* Total budget */}
       <Section label="Presupuesto total del viaje">
         <div style={styles.inputRow}>
           <span style={styles.prefix}>USD</span>
@@ -79,7 +75,6 @@ export default function BudgetConfig({ config, onSave }) {
         </div>
       </Section>
 
-      {/* Prepaid */}
       <Section label="Pagado antes del viaje">
         <div style={styles.prepaidGrid}>
           <PrepaidInput label="✈ Vuelos" value={form.prepaid?.flights || ''} onChange={v => handlePrepaid('flights', v)} />
@@ -88,22 +83,23 @@ export default function BudgetConfig({ config, onSave }) {
         </div>
       </Section>
 
-      {/* City budgets */}
-      <Section label="Presupuesto por ciudad">
-        <div style={styles.prepaidGrid}>
-          {CITIES.filter(c => c !== 'General').map(city => (
-            <PrepaidInput
-              key={city}
-              label={city === 'New York City' ? '🗽 NYC' : city === 'Los Angeles' ? '🎬 LA' : `🏰 ${city}`}
-              value={form.cityBudgets?.[city] ?? DEFAULT_CITY_BUDGETS[city]}
-              onChange={v => handleCityBudget(city, v)}
-            />
-          ))}
-        </div>
-        <p style={styles.hint}>Usado para mostrar el progreso por ciudad en el desglose.</p>
-      </Section>
+      {/* City budgets — only from wizard cities */}
+      {tripCities.length > 0 && (
+        <Section label="Presupuesto por ciudad">
+          <div style={styles.prepaidGrid}>
+            {tripCities.map(city => (
+              <PrepaidInput
+                key={city.name}
+                label={`📍 ${city.name}`}
+                value={form.cities?.find(c => c.name === city.name)?.budget ?? city.budget ?? 0}
+                onChange={v => handleCityBudget(city.name, v)}
+              />
+            ))}
+          </div>
+          <p style={styles.hint}>Usado para mostrar el progreso por ciudad en el desglose.</p>
+        </Section>
+      )}
 
-      {/* Duration */}
       <Section label="Duración del viaje">
         <div style={styles.inputRow}>
           <input type="number" value={form.totalDays || ''} onChange={e => handleChange('totalDays', e.target.value)} placeholder="16" min="1" max="365" style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 600 }} />
@@ -111,32 +107,29 @@ export default function BudgetConfig({ config, onSave }) {
         </div>
       </Section>
 
-      {/* Timezone */}
       <Section label="Zona horaria actual">
         <select value={form.timezone || 'America/New_York'} onChange={e => setForm(prev => ({ ...prev, timezone: e.target.value }))}>
           {TIMEZONES.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
         </select>
-        <p style={styles.hint}>Cámbiala cuando te muevas de ciudad. El cambio de día ocurre a medianoche en esta zona.</p>
+        <p style={styles.hint}>Cámbiala cuando te muevas de ciudad.</p>
       </Section>
 
-      {/* Start date */}
       <Section label="Inicio del viaje">
-        <button onClick={handleStartNow} style={styles.startBtn}>
+        <button onClick={() => setForm(prev => ({ ...prev, startDate: new Date().toISOString() }))} style={styles.startBtn}>
           {form.startDate ? '🔄 Reiniciar desde ahora' : '🚀 Iniciar viaje ahora'}
         </button>
-        <p style={styles.hint}>O ajusta la fecha manualmente:</p>
+        <p style={styles.hint}>O ajusta manualmente:</p>
         <input
           type="datetime-local"
           value={form.startDate ? new Date(form.startDate).toISOString().slice(0, 16) : ''}
           onChange={e => setForm(prev => ({ ...prev, startDate: e.target.value ? new Date(e.target.value).toISOString() : null }))}
-          style={{ fontSize: 13, width: '100%' }}
+          style={{ fontSize: 13, width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}
         />
         {startLabel && (
           <div style={styles.startedBadge}>✓ Iniciado el {startLabel} ({tzLabel})</div>
         )}
       </Section>
 
-      {/* Summary */}
       <div style={styles.summary}>
         <SummaryRow label="Total prepagado" value={fmt(totalPrepaid)} />
         <SummaryRow label="Disponible para gastar" value={fmt(Math.max(usable, 0))} color="#4AE6A4" />
@@ -160,7 +153,7 @@ function Section({ label, children }) {
 function PrepaidInput({ label, value, onChange }) {
   return (
     <div>
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
       <div style={{ position: 'relative' }}>
         <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>$</span>
         <input type="number" value={value} onChange={e => onChange(e.target.value)} style={{ paddingLeft: 24, fontSize: 14 }} min="0" />
