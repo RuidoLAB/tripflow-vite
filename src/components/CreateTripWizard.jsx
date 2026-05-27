@@ -386,7 +386,7 @@ function SRow({ label, value, color }) {
 }
 
 // ── Main Wizard ───────────────────────────────────────────────────────────────
-export default function CreateTripWizard({ onClose, onCreated }) {
+export default function CreateTripWizard({ onClose, onCreated, userId }) {
   const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(false)
 
@@ -402,7 +402,7 @@ export default function CreateTripWizard({ onClose, onCreated }) {
   }
 
   function canNext() {
-    if (step === 0) return basic.name.trim().length > 0 && basic.totalBudget > 0 && basic.totalDays > 0
+    if (step === 0) return basic.name.trim().length > 0 && parseFloat(basic.totalBudget) > 0 && parseInt(basic.totalDays) > 0
     if (step === 1) return cities.length > 0
     return true
   }
@@ -417,6 +417,7 @@ export default function CreateTripWizard({ onClose, onCreated }) {
 
     const { supabase } = await import('../lib/supabase')
     const { data } = await supabase.from('trips').insert({
+      user_id: userId,
       name: basic.name.trim(),
       description: basic.description.trim(),
       total_budget: parseFloat(basic.totalBudget) || 0,
