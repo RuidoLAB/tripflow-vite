@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../hooks/useAuth'
 import CreateTripWizard from '../components/CreateTripWizard'
 
 export default function Trips() {
+  const { user } = useAuth()
   const [trips, setTrips] = useState([])
   const [loading, setLoading] = useState(true)
   const [showWizard, setShowWizard] = useState(false)
@@ -12,7 +14,7 @@ export default function Trips() {
   useEffect(() => { loadTrips() }, [])
 
   async function loadTrips() {
-    const { data } = await supabase.from('trips').select('*').order('created_at', { ascending: false })
+    const { data } = await supabase.from('trips').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
     setTrips(data || [])
     setLoading(false)
   }
@@ -55,6 +57,7 @@ export default function Trips() {
         <CreateTripWizard
           onClose={() => setShowWizard(false)}
           onCreated={handleCreated}
+          userId={user?.id}
         />
       )}
 
@@ -65,6 +68,7 @@ export default function Trips() {
             <span style={styles.logoTitle}>TripFlow</span>
           </div>
           <p style={styles.logoSub}>Tu tracker de viajes</p>
+          <button onClick={async () => { await supabase.auth.signOut() }} style={styles.signOutBtn}>Cerrar sesión</button>
         </div>
 
         <button onClick={() => setShowWizard(true)} style={styles.newBtn} className="fade-up">
@@ -154,4 +158,5 @@ const styles = {
   tripRight: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 },
   arrow: { fontSize: 22, color: 'rgba(255,255,255,0.2)' },
   deleteBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.15)', fontSize: 20, cursor: 'pointer', padding: '0 4px', lineHeight: 1 },
+  signOutBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', fontSize: 13, cursor: 'pointer', marginTop: 8 },
 }
