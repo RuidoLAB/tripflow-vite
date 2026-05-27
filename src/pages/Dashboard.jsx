@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../hooks/useAuth'
 import Hero from '../components/Hero'
 import PrepaidCard from '../components/PrepaidCard'
 import AddExpenseForm from '../components/AddExpenseForm'
@@ -30,6 +31,7 @@ function tripToConfig(trip) {
 export default function Dashboard() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [trip, setTrip] = useState(null)
   const [expenses, setExpenses] = useState([])
   const [loading, setLoading] = useState(true)
@@ -68,7 +70,7 @@ export default function Dashboard() {
   async function handleAdd(expense) {
     const { data } = await supabase
       .from('expenses')
-      .insert({ ...expense, trip_id: id, user_id: 'tripflow-user-2025' })
+      .insert({ ...expense, trip_id: id, user_id: user?.id })
       .select()
       .single()
     if (data) setExpenses(prev => [data, ...prev])
