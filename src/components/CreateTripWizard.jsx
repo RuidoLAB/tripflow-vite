@@ -1,7 +1,14 @@
 import { useState } from 'react'
 import { TIMEZONES, fmt } from '../lib/budget'
+import TripCalendar from './TripCalendar'
 
-const STEPS = ['Básico', 'Destinos', 'Prepagados', 'Resumen']
+const STEPS = ['Básico', 'Destinos', 'Calendario', 'Prepagados', 'Resumen']
+
+const CITY_COLORS = [
+  '#4AE6A4', '#60AAFF', '#FFB547', '#F472B6',
+  '#818CF8', '#34D399', '#FB923C', '#38BDF8',
+  '#FACC15', '#A78BFA', '#FF5757', '#86EFAC',
+]
 
 const PREPAID_CATEGORIES = [
   { value: 'vuelos', label: '✈️ Vuelos' },
@@ -22,7 +29,7 @@ function StepIndicator({ current }) {
               ...si.dot,
               background: i < current ? '#4AE6A4' : i === current ? '#fff' : 'rgba(255,255,255,0.1)',
               border: i === current ? '2px solid #4AE6A4' : 'none',
-              color: i < current ? '#080A0F' : i === current ? '#080A0F' : 'rgba(255,255,255,0.4)',
+              color: i <= current ? '#080A0F' : 'rgba(255,255,255,0.4)',
             }}>
               {i < current ? '✓' : i + 1}
             </div>
@@ -40,10 +47,10 @@ const si = {
   item: { display: 'flex', alignItems: 'center', gap: 0 },
   dot: { width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, flexShrink: 0 },
   label: { fontSize: 10, fontWeight: 500, whiteSpace: 'nowrap', textAlign: 'center' },
-  line: { width: 16, height: 1, flexShrink: 0 },
+  line: { width: 12, height: 1, flexShrink: 0 },
 }
 
-// ── Step 1: Basic info ────────────────────────────────────────────────────────
+// ── Step 1: Basic ─────────────────────────────────────────────────────────────
 function Step1({ data, onChange }) {
   return (
     <div style={s.stepWrap}>
@@ -52,7 +59,7 @@ function Step1({ data, onChange }) {
 
       <div style={s.field}>
         <div style={s.label}>Nombre del viaje</div>
-        <input type="text" placeholder="ej: EE.UU. 2025" value={data.name} onChange={e => onChange('name', e.target.value)} maxLength={60} autoFocus />
+        <input type="text" placeholder="ej: Europa 2025" value={data.name} onChange={e => onChange('name', e.target.value)} maxLength={60} autoFocus />
       </div>
 
       <div style={s.field}>
@@ -72,12 +79,12 @@ function Step1({ data, onChange }) {
         <div style={{ ...s.field, flex: 1 }}>
           <div style={s.label}>Duración total</div>
           <div style={{ position: 'relative' }}>
-            <input type="number" placeholder="16" value={data.totalDays} onChange={e => onChange('totalDays', e.target.value)} min="1" max="365" style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }} />
+            <input type="number" placeholder="16" value={data.totalDays} onChange={e => onChange('totalDays', e.target.value)} min="1" max="365" style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, paddingRight: 40 }} />
             <span style={s.inputSuffix}>días</span>
           </div>
         </div>
         <div style={{ ...s.field, flex: 1 }}>
-          <div style={s.label}>Zona horaria inicial</div>
+          <div style={s.label}>Zona horaria</div>
           <select value={data.timezone} onChange={e => onChange('timezone', e.target.value)}>
             {TIMEZONES.map(tz => <option key={tz.value} value={tz.value}>{tz.label.split(' — ')[0]}</option>)}
           </select>
@@ -90,7 +97,7 @@ function Step1({ data, onChange }) {
           {data.startDate ? '🔄 Reiniciar desde ahora' : '🚀 Iniciar desde ahora'}
         </button>
         <div style={{ marginTop: 8 }}>
-          <div style={{ ...s.label, marginBottom: 6 }}>O elige fecha y hora manualmente</div>
+          <div style={{ ...s.label, marginBottom: 6 }}>O elige manualmente</div>
           <input
             type="datetime-local"
             value={data.startDate ? new Date(data.startDate).toISOString().slice(0, 16) : ''}
@@ -109,127 +116,52 @@ function Step1({ data, onChange }) {
 }
 
 // ── Step 2: Destinations ──────────────────────────────────────────────────────
-function Step2({ data, onChange, totalDays }) {
-  const [newCity, setNewCity] = useState({ name: '', days: '', budget: '' })
+function Step2({ data, onChange }) {
+  const [newName, setNewName] = useState('')
 
   function addCity() {
-    if (!newCity.name.trim() || !newCity.days) return
-    const updated = [...data, { name: newCity.name.trim(), days: parseInt(newCity.days), budget: parseFloat(newCity.budget) || 0 }]
-    onChange(updated)
-    setNewCity({ name: '', days: '', budget: '' })
+    if (!newName.trim()) return
+    if (data.find(c => c.name.toLowerCase() === newName.trim().toLowerCase())) return
+    onChange([...data, { name: newName.trim() }])
+    setNewName('')
   }
 
   function removeCity(i) {
     onChange(data.filter((_, idx) => idx !== i))
   }
 
-  function updateCity(i, key, value) {
-    const updated = data.map((c, idx) => idx === i ? { ...c, [key]: key === 'name' ? value : parseFloat(value) || 0 } : c)
-    onChange(updated)
-  }
-
-  const totalAssigned = data.reduce((s, c) => s + (parseInt(c.days) || 0), 0)
-  const remaining = parseInt(totalDays) - totalAssigned
-  const isOver = remaining < 0
-
   return (
     <div style={s.stepWrap}>
       <div style={s.stepTitle}>Destinos</div>
-      <div style={s.stepSub}>¿A qué ciudades vas y cuántos días en cada una?</div>
+      <div style={s.stepSub}>¿A qué ciudades o países vas? Los asignarás al calendario en el siguiente paso.</div>
 
-      {/* Days counter */}
-      <div style={{ ...s.daysCounter, borderColor: isOver ? 'rgba(255,87,87,0.3)' : remaining === 0 ? 'rgba(74,230,164,0.3)' : 'rgba(255,255,255,0.08)' }}>
-        <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Días asignados</span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: isOver ? '#FF5757' : remaining === 0 ? '#4AE6A4' : '#fff' }}>
-          {totalAssigned} / {totalDays || '?'}
-          {remaining > 0 && <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', fontWeight: 400 }}> ({remaining} sin asignar)</span>}
-          {isOver && <span style={{ fontSize: 12, color: '#FF5757', fontWeight: 400 }}> ({Math.abs(remaining)} de más)</span>}
-          {remaining === 0 && totalAssigned > 0 && <span style={{ fontSize: 12, color: '#4AE6A4', fontWeight: 400 }}> ✓ perfecto</span>}
-        </span>
-      </div>
-
-      {/* Existing cities */}
       {data.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {data.map((city, i) => (
-            <div key={i} style={s.cityRow}>
-              <div style={s.cityEmoji}>📍</div>
-              <input
-                type="text"
-                value={city.name}
-                onChange={e => updateCity(i, 'name', e.target.value)}
-                placeholder="Ciudad"
-                style={{ flex: 2, fontSize: 14 }}
-              />
-              <div style={{ position: 'relative', flex: 1 }}>
-                <input
-                  type="number"
-                  value={city.days || ''}
-                  onChange={e => updateCity(i, 'days', e.target.value)}
-                  placeholder="días"
-                  min="1"
-                  style={{ fontSize: 14, paddingRight: 36 }}
-                />
-                <span style={s.inputSuffixAbs}>días</span>
-              </div>
-              <div style={{ position: 'relative', flex: 1 }}>
-                <span style={s.inputPrefixAbs}>$</span>
-                <input
-                  type="number"
-                  value={city.budget || ''}
-                  onChange={e => updateCity(i, 'budget', e.target.value)}
-                  placeholder="ppto"
-                  min="0"
-                  style={{ fontSize: 14, paddingLeft: 20 }}
-                />
-              </div>
+            <div key={i} style={s.cityChip}>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: CITY_COLORS[i % CITY_COLORS.length], flexShrink: 0 }} />
+              <span style={{ flex: 1, fontSize: 14, color: '#fff' }}>{city.name}</span>
               <button onClick={() => removeCity(i)} style={s.removeBtn}>×</button>
             </div>
           ))}
         </div>
       )}
 
-      {/* Add new city */}
-      <div style={s.addCityWrap}>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Agregar destino</div>
-        <div style={s.cityRow}>
-          <div style={s.cityEmoji}>📍</div>
-          <input
-            type="text"
-            value={newCity.name}
-            onChange={e => setNewCity(p => ({ ...p, name: e.target.value }))}
-            placeholder="Nombre ciudad"
-            style={{ flex: 2, fontSize: 14 }}
-            onKeyDown={e => e.key === 'Enter' && addCity()}
-          />
-          <div style={{ position: 'relative', flex: 1 }}>
-            <input
-              type="number"
-              value={newCity.days}
-              onChange={e => setNewCity(p => ({ ...p, days: e.target.value }))}
-              placeholder="días"
-              min="1"
-              style={{ fontSize: 14, paddingRight: 36 }}
-            />
-            <span style={s.inputSuffixAbs}>días</span>
-          </div>
-          <div style={{ position: 'relative', flex: 1 }}>
-            <span style={s.inputPrefixAbs}>$</span>
-            <input
-              type="number"
-              value={newCity.budget}
-              onChange={e => setNewCity(p => ({ ...p, budget: e.target.value }))}
-              placeholder="ppto"
-              min="0"
-              style={{ fontSize: 14, paddingLeft: 20 }}
-            />
-          </div>
-          <button onClick={addCity} style={s.addBtn}>+</button>
-        </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          type="text"
+          value={newName}
+          onChange={e => setNewName(e.target.value)}
+          placeholder="ej: París, Londres, Roma..."
+          onKeyDown={e => e.key === 'Enter' && addCity()}
+          style={{ flex: 1, fontSize: 14 }}
+          autoFocus
+        />
+        <button onClick={addCity} style={s.addBtn}>+</button>
       </div>
 
       {data.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '20px 0', color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13, padding: '12px 0' }}>
           Agrega al menos un destino
         </div>
       )}
@@ -237,8 +169,26 @@ function Step2({ data, onChange, totalDays }) {
   )
 }
 
-// ── Step 3: Prepaid items ─────────────────────────────────────────────────────
-function Step3({ data, onChange, totalBudget }) {
+// ── Step 3: Calendar ──────────────────────────────────────────────────────────
+function Step3({ cities, startDate, totalDays, dayAssignments, onChange }) {
+  const effectiveStart = startDate || new Date().toISOString()
+  return (
+    <div style={s.stepWrap}>
+      <div style={s.stepTitle}>Calendario</div>
+      <div style={s.stepSub}>Selecciona un destino y toca o arrastra los días del viaje.</div>
+      <TripCalendar
+        startDate={effectiveStart}
+        totalDays={parseInt(totalDays) || 16}
+        cities={cities}
+        dayAssignments={dayAssignments}
+        onChange={onChange}
+      />
+    </div>
+  )
+}
+
+// ── Step 4: Prepaid ───────────────────────────────────────────────────────────
+function Step4({ data, onChange, totalBudget }) {
   const [newItem, setNewItem] = useState({ name: '', category: 'vuelos', amount: '' })
 
   function addItem() {
@@ -247,19 +197,16 @@ function Step3({ data, onChange, totalBudget }) {
     setNewItem({ name: '', category: 'vuelos', amount: '' })
   }
 
-  function removeItem(id) {
-    onChange(data.filter(i => i.id !== id))
-  }
+  function removeItem(id) { onChange(data.filter(i => i.id !== id)) }
 
   const totalPrepaid = data.reduce((s, i) => s + Number(i.amount), 0)
   const usable = (parseFloat(totalBudget) || 0) - totalPrepaid
 
   return (
     <div style={s.stepWrap}>
-      <div style={s.stepTitle}>Pagado antes del viaje</div>
-      <div style={s.stepSub}>Agrega todo lo que ya pagaste — se descuenta del presupuesto total</div>
+      <div style={s.stepTitle}>Prepagados</div>
+      <div style={s.stepSub}>Agrega todo lo que ya pagaste antes del viaje.</div>
 
-      {/* Summary */}
       <div style={s.prepaidSummary}>
         <div style={s.summaryRow}>
           <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Total prepagado</span>
@@ -271,9 +218,8 @@ function Step3({ data, onChange, totalBudget }) {
         </div>
       </div>
 
-      {/* Existing items */}
       {data.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {data.map(item => (
             <div key={item.id} style={s.prepaidItem}>
               <span style={{ fontSize: 18 }}>{PREPAID_CATEGORIES.find(c => c.value === item.category)?.label.split(' ')[0] || '📦'}</span>
@@ -288,39 +234,37 @@ function Step3({ data, onChange, totalBudget }) {
         </div>
       )}
 
-      {/* Add new item */}
-      <div style={s.addCityWrap}>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Agregar item</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <input type="text" value={newItem.name} onChange={e => setNewItem(p => ({ ...p, name: e.target.value }))} placeholder="ej: Vuelo Santiago-Miami" style={{ fontSize: 14 }} />
-          <div style={s.row}>
-            <select value={newItem.category} onChange={e => setNewItem(p => ({ ...p, category: e.target.value }))} style={{ flex: 1, fontSize: 13 }}>
-              {PREPAID_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
-            <div style={{ position: 'relative', flex: 1 }}>
-              <span style={s.inputPrefixAbs}>$</span>
-              <input type="number" value={newItem.amount} onChange={e => setNewItem(p => ({ ...p, amount: e.target.value }))} placeholder="monto" min="0" style={{ fontSize: 14, paddingLeft: 20 }} />
-            </div>
-            <button onClick={addItem} style={s.addBtn}>+</button>
+      <div style={s.addItemWrap}>
+        <input type="text" value={newItem.name} onChange={e => setNewItem(p => ({ ...p, name: e.target.value }))} placeholder="ej: Vuelo Santiago-París" style={{ fontSize: 14 }} />
+        <div style={s.row}>
+          <select value={newItem.category} onChange={e => setNewItem(p => ({ ...p, category: e.target.value }))} style={{ flex: 1, fontSize: 13 }}>
+            {PREPAID_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <span style={s.inputPrefixAbs}>$</span>
+            <input type="number" value={newItem.amount} onChange={e => setNewItem(p => ({ ...p, amount: e.target.value }))} placeholder="monto" min="0" style={{ fontSize: 14, paddingLeft: 20 }} />
           </div>
+          <button onClick={addItem} style={s.addBtn}>+</button>
         </div>
       </div>
 
       {data.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '16px 0', color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>
-          Sin items prepagados aún — puedes saltarte este paso
-        </div>
+        <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>Sin items — puedes saltarte este paso</div>
       )}
     </div>
   )
 }
 
-// ── Step 4: Summary ───────────────────────────────────────────────────────────
-function Step4({ basic, cities, prepaid }) {
+// ── Step 5: Summary ───────────────────────────────────────────────────────────
+function Step5({ basic, cities, dayAssignments, prepaid }) {
   const totalPrepaid = prepaid.reduce((s, i) => s + Number(i.amount), 0)
   const usable = (parseFloat(basic.totalBudget) || 0) - totalPrepaid
   const dailyBudget = usable / (parseInt(basic.totalDays) || 1)
-  const totalCityDays = cities.reduce((s, c) => s + (parseInt(c.days) || 0), 0)
+
+  const citySummary = {}
+  Object.values(dayAssignments).forEach(c => { citySummary[c] = (citySummary[c] || 0) + 1 })
+  const assignedDays = Object.keys(dayAssignments).length
+  const unassigned = parseInt(basic.totalDays) - assignedDays
 
   return (
     <div style={s.stepWrap}>
@@ -328,17 +272,14 @@ function Step4({ basic, cities, prepaid }) {
       <div style={s.stepSub}>Todo listo para crear tu viaje</div>
 
       <div style={s.summaryCard}>
-        <div style={s.summaryBig}>{basic.name || 'Mi viaje'}</div>
-        {basic.description && <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', marginBottom: 16 }}>{basic.description}</div>}
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <SRow label="Presupuesto total" value={fmt(parseFloat(basic.totalBudget) || 0)} />
-          <SRow label="Total prepagado" value={fmt(totalPrepaid)} />
-          <SRow label="Disponible para gastar" value={fmt(Math.max(usable, 0))} color="#4AE6A4" />
-          <SRow label="Presupuesto diario" value={`${fmt(dailyBudget)}/día`} color="#60AAFF" />
-          <SRow label="Duración" value={`${basic.totalDays} días`} />
-          {basic.startDate && <SRow label="Inicio" value={new Date(basic.startDate).toLocaleString('es-CL', { timeZone: basic.timezone, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} />}
-        </div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, color: '#fff', marginBottom: 8 }}>{basic.name}</div>
+        {basic.description && <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', marginBottom: 12 }}>{basic.description}</div>}
+        <SRow label="Presupuesto total" value={fmt(parseFloat(basic.totalBudget) || 0)} />
+        <SRow label="Total prepagado" value={fmt(totalPrepaid)} />
+        <SRow label="Disponible para gastar" value={fmt(Math.max(usable, 0))} color="#4AE6A4" />
+        <SRow label="Presupuesto diario" value={`${fmt(dailyBudget)}/día`} color="#60AAFF" />
+        <SRow label="Duración" value={`${basic.totalDays} días`} />
+        {basic.startDate && <SRow label="Inicio" value={new Date(basic.startDate).toLocaleString('es-CL', { timeZone: basic.timezone, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} />}
       </div>
 
       {cities.length > 0 && (
@@ -346,17 +287,14 @@ function Step4({ basic, cities, prepaid }) {
           <div style={s.summarySectionTitle}>Destinos</div>
           {cities.map((city, i) => (
             <div key={i} style={s.summaryItem}>
-              <span style={{ fontSize: 14 }}>📍</span>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: CITY_COLORS[i % CITY_COLORS.length], flexShrink: 0 }} />
               <span style={{ flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>{city.name}</span>
-              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>{city.days} días</span>
-              {city.budget > 0 && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#60AAFF' }}>{fmt(city.budget)}</span>}
+              <span style={{ fontSize: 12, color: citySummary[city.name] ? CITY_COLORS[i % CITY_COLORS.length] : 'rgba(255,255,255,0.2)', fontFamily: 'var(--font-mono)' }}>
+                {citySummary[city.name] ? `${citySummary[city.name]} días` : 'sin asignar'}
+              </span>
             </div>
           ))}
-          {parseInt(basic.totalDays) !== totalCityDays && (
-            <div style={{ fontSize: 11, color: '#FFB547', marginTop: 6 }}>
-              ⚠ {totalCityDays} días asignados de {basic.totalDays} totales
-            </div>
-          )}
+          {unassigned > 0 && <div style={{ fontSize: 11, color: '#FFB547', marginTop: 4 }}>⚠ {unassigned} días sin asignar en el calendario</div>}
         </div>
       )}
 
@@ -365,7 +303,7 @@ function Step4({ basic, cities, prepaid }) {
           <div style={s.summarySectionTitle}>Prepagado</div>
           {prepaid.map(item => (
             <div key={item.id} style={s.summaryItem}>
-              <span style={{ fontSize: 14 }}>{PREPAID_CATEGORIES.find(c => c.value === item.category)?.label.split(' ')[0]}</span>
+              <span>{PREPAID_CATEGORIES.find(c => c.value === item.category)?.label.split(' ')[0]}</span>
               <span style={{ flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>{item.name}</span>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#FFB547' }}>{fmt(item.amount)}</span>
             </div>
@@ -378,7 +316,7 @@ function Step4({ basic, cities, prepaid }) {
 
 function SRow({ label, value, color }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' }}>
       <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>{label}</span>
       <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: color || '#fff' }}>{value}</span>
     </div>
@@ -395,6 +333,7 @@ export default function CreateTripWizard({ onClose, onCreated, userId }) {
     timezone: 'America/New_York', startDate: '',
   })
   const [cities, setCities] = useState([])
+  const [dayAssignments, setDayAssignments] = useState({})
   const [prepaid, setPrepaid] = useState([])
 
   function updateBasic(key, value) {
@@ -413,7 +352,13 @@ export default function CreateTripWizard({ onClose, onCreated, userId }) {
     const totalUsable = Math.max((parseFloat(basic.totalBudget) || 0) - totalPrepaid, 0)
 
     const cityBudgets = {}
-    cities.forEach(c => { cityBudgets[c.name] = c.budget || 0 })
+    cities.forEach(c => { cityBudgets[c.name] = 0 })
+
+    const citiesWithDays = cities.map(c => ({
+      name: c.name,
+      days: Object.values(dayAssignments).filter(v => v === c.name).length,
+      budget: 0,
+    }))
 
     const { supabase } = await import('../lib/supabase')
     const { data } = await supabase.from('trips').insert({
@@ -426,7 +371,8 @@ export default function CreateTripWizard({ onClose, onCreated, userId }) {
       timezone: basic.timezone,
       start_date: basic.startDate || null,
       city_budgets: cityBudgets,
-      cities: cities,
+      cities: citiesWithDays,
+      day_assignments: dayAssignments,
       prepaid_items: prepaid,
       prepaid_flights: prepaid.filter(i => i.category === 'vuelos').reduce((s, i) => s + Number(i.amount), 0),
       prepaid_parks: prepaid.filter(i => i.category === 'parques').reduce((s, i) => s + Number(i.amount), 0),
@@ -440,34 +386,30 @@ export default function CreateTripWizard({ onClose, onCreated, userId }) {
   return (
     <div style={w.overlay}>
       <div style={w.modal}>
-        {/* Header */}
         <div style={w.header}>
           <button onClick={onClose} style={w.closeBtn}>×</button>
         </div>
 
         <StepIndicator current={step} />
 
-        {/* Step content */}
         <div style={w.content}>
           {step === 0 && <Step1 data={basic} onChange={updateBasic} />}
-          {step === 1 && <Step2 data={cities} onChange={setCities} totalDays={basic.totalDays} />}
-          {step === 2 && <Step3 data={prepaid} onChange={setPrepaid} totalBudget={basic.totalBudget} />}
-          {step === 3 && <Step4 basic={basic} cities={cities} prepaid={prepaid} />}
+          {step === 1 && <Step2 data={cities} onChange={setCities} />}
+          {step === 2 && <Step3 cities={cities} startDate={basic.startDate} totalDays={basic.totalDays} dayAssignments={dayAssignments} onChange={setDayAssignments} />}
+          {step === 3 && <Step4 data={prepaid} onChange={setPrepaid} totalBudget={basic.totalBudget} />}
+          {step === 4 && <Step5 basic={basic} cities={cities} dayAssignments={dayAssignments} prepaid={prepaid} />}
         </div>
 
-        {/* Navigation */}
         <div style={w.nav}>
-          {step > 0 && (
-            <button onClick={() => setStep(s => s - 1)} style={w.backBtn}>← Atrás</button>
-          )}
+          {step > 0 && <button onClick={() => setStep(s => s - 1)} style={w.backBtn}>← Atrás</button>}
           <div style={{ flex: 1 }} />
-          {step < 3 ? (
+          {step < 4 ? (
             <button
               onClick={() => setStep(s => s + 1)}
               style={{ ...w.nextBtn, opacity: canNext() ? 1 : 0.4, cursor: canNext() ? 'pointer' : 'not-allowed' }}
               disabled={!canNext()}
             >
-              {step === 2 ? 'Ver resumen →' : 'Siguiente →'}
+              {step === 3 ? 'Ver resumen →' : 'Siguiente →'}
             </button>
           ) : (
             <button onClick={handleCreate} disabled={loading} className="btn-primary" style={{ minWidth: 160 }}>
@@ -480,7 +422,6 @@ export default function CreateTripWizard({ onClose, onCreated, userId }) {
   )
 }
 
-// Shared styles
 const s = {
   stepWrap: { display: 'flex', flexDirection: 'column', gap: 16 },
   stepTitle: { fontFamily: 'var(--font-display)', fontSize: 22, color: '#fff', marginBottom: 2 },
@@ -491,32 +432,28 @@ const s = {
   inputPrefix: { position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: 'rgba(255,255,255,0.3)', pointerEvents: 'none' },
   inputPrefixAbs: { position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: 'rgba(255,255,255,0.3)', pointerEvents: 'none', zIndex: 1 },
   inputSuffix: { position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: 'rgba(255,255,255,0.3)', pointerEvents: 'none' },
-  inputSuffixAbs: { position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: 'rgba(255,255,255,0.3)', pointerEvents: 'none' },
   startBtn: { width: '100%', background: 'rgba(74,230,164,0.1)', border: '1px solid rgba(74,230,164,0.2)', borderRadius: 12, padding: '12px', color: '#4AE6A4', fontSize: 14, fontWeight: 600, cursor: 'pointer' },
   startedBadge: { fontSize: 12, color: '#4AE6A4', background: 'rgba(74,230,164,0.08)', border: '1px solid rgba(74,230,164,0.15)', borderRadius: 8, padding: '8px 12px', marginTop: 4 },
-  daysCounter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid', borderRadius: 12, padding: '12px 16px' },
-  cityRow: { display: 'flex', alignItems: 'center', gap: 8, position: 'relative' },
-  cityEmoji: { fontSize: 16, flexShrink: 0 },
-  addCityWrap: { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 14 },
-  removeBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: 20, cursor: 'pointer', padding: '0 4px', lineHeight: 1, flexShrink: 0 },
-  addBtn: { background: 'rgba(74,230,164,0.1)', border: '1px solid rgba(74,230,164,0.2)', borderRadius: 8, color: '#4AE6A4', fontSize: 18, width: 36, height: 36, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  cityChip: { display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '10px 14px' },
+  addBtn: { background: 'rgba(74,230,164,0.1)', border: '1px solid rgba(74,230,164,0.2)', borderRadius: 8, color: '#4AE6A4', fontSize: 20, width: 40, height: 40, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  removeBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: 20, cursor: 'pointer', padding: '0 4px', lineHeight: 1 },
   prepaidSummary: { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 },
   summaryRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   prepaidItem: { display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '10px 12px' },
-  summaryCard: { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: 20, display: 'flex', flexDirection: 'column', gap: 10 },
-  summaryBig: { fontFamily: 'var(--font-display)', fontSize: 22, color: '#fff', marginBottom: 8 },
-  summarySection: { display: 'flex', flexDirection: 'column', gap: 8 },
+  addItemWrap: { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 },
+  summaryCard: { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: 20, display: 'flex', flexDirection: 'column', gap: 4 },
+  summarySection: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 },
   summarySectionTitle: { fontSize: 11, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4 },
-  summaryItem: { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' },
+  summaryItem: { display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' },
 }
 
 const w = {
-  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0' },
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
   modal: { background: '#0D1017', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '24px 24px 0 0', width: '100%', maxWidth: 600, height: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-  header: { display: 'flex', justifyContent: 'flex-end', padding: '16px 20px 0' },
+  header: { display: 'flex', justifyContent: 'flex-end', padding: '16px 20px 0', flexShrink: 0 },
   closeBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 24, cursor: 'pointer', lineHeight: 1 },
   content: { flex: 1, overflowY: 'auto', padding: '0 24px 24px' },
-  nav: { display: 'flex', alignItems: 'center', gap: 12, padding: '16px 24px', borderTop: '1px solid rgba(255,255,255,0.07)' },
+  nav: { display: 'flex', alignItems: 'center', gap: 12, padding: '16px 24px', borderTop: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 },
   backBtn: { background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 16px', color: 'rgba(255,255,255,0.5)', fontSize: 13, cursor: 'pointer' },
   nextBtn: { background: '#4AE6A4', color: '#080A0F', border: 'none', borderRadius: 12, padding: '12px 20px', fontSize: 14, fontWeight: 600 },
 }
