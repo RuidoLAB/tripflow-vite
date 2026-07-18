@@ -9,6 +9,7 @@ import CategoryChart from '../components/CategoryChart'
 import CityBreakdown from '../components/CityBreakdown'
 import ExpenseList from '../components/ExpenseList'
 import BudgetConfig from '../components/BudgetConfig'
+import Itinerary from './Itinerary'
 
 function tripToConfig(trip) {
   if (!trip) return null
@@ -35,6 +36,7 @@ export default function Dashboard() {
   const [trip, setTrip] = useState(null)
   const [expenses, setExpenses] = useState([])
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('finanzas')
 
   const load = useCallback(async () => {
     const [{ data: tripData }, { data: expData }] = await Promise.all([
@@ -62,6 +64,7 @@ export default function Dashboard() {
       prepaid_parks: newConfig.prepaid.parks,
       prepaid_hotel: newConfig.prepaid.hotel,
       city_budgets: newConfig.cityBudgets || null,
+      cities: newConfig.cities || [],
     }
     const { data } = await supabase.from('trips').update(updates).eq('id', id).select().single()
     if (data) setTrip(data)
@@ -94,6 +97,7 @@ export default function Dashboard() {
     <div style={{ minHeight: '100vh', background: '#080A0F', position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'fixed', top: 0, left: '50%', transform: 'translateX(-50%)', width: 600, height: 300, background: 'rgba(74,230,164,0.04)', borderRadius: '50%', filter: 'blur(60px)', pointerEvents: 'none', zIndex: 0 }} />
 
+      {/* Nav */}
       <nav style={styles.nav}>
         <div style={styles.navLeft}>
           <button onClick={() => navigate('/')} style={styles.backBtn}>‹</button>
@@ -102,37 +106,65 @@ export default function Dashboard() {
             <span style={styles.navTitle}>{trip.name}</span>
           </div>
         </div>
+        <button onClick={async () => { await supabase.auth.signOut(); navigate('/login') }} style={styles.signOutBtn}>Salir</button>
       </nav>
 
-      <main style={styles.main}>
-        <div className="fade-up"><Hero expenses={expenses} config={config} /></div>
-
-        <div style={styles.sectionLabel}>Agregar gasto</div>
-        <div className="fade-up-2"><AddExpenseForm onAdd={handleAdd} /></div>
-
-        <div className="fade-up-3"><BudgetConfig config={config} onSave={handleSaveConfig} /></div>
-        <div className="fade-up-3"><PrepaidCard config={config} /></div>
-
-        <div style={styles.sectionLabel}>Desglose</div>
-        <div style={styles.chartsGrid}>
-          <CategoryChart expenses={expenses} />
-          <CityBreakdown expenses={expenses} config={config} />
+      {/* Tabs */}
+      <div style={styles.tabBar}>
+        <div style={styles.tabWrap}>
+          <button
+            onClick={() => setActiveTab('finanzas')}
+            style={{ ...styles.tab, ...(activeTab === 'finanzas' ? styles.tabActive : {}) }}
+          >
+            💰 Finanzas
+          </button>
+          <button
+            onClick={() => setActiveTab('itinerario')}
+            style={{ ...styles.tab, ...(activeTab === 'itinerario' ? styles.tabActive : {}) }}
+          >
+            🗺️ Itinerario
+          </button>
         </div>
+      </div>
 
-        <div style={styles.sectionLabel}>Gastos recientes</div>
-        <ExpenseList expenses={expenses} onDelete={handleDelete} />
+      <main style={styles.main}>
+        {activeTab === 'finanzas' && (
+          <>
+            <div className="fade-up"><Hero expenses={expenses} config={config} /></div>
+            <div style={styles.sectionLabel}>Agregar gasto</div>
+            <div className="fade-up-2"><AddExpenseForm onAdd={handleAdd} /></div>
+            <div className="fade-up-3"><BudgetConfig config={config} onSave={handleSaveConfig} /></div>
+            <div className="fade-up-3"><PrepaidCard config={config} /></div>
+            <div style={styles.sectionLabel}>Desglose</div>
+            <div style={styles.chartsGrid}>
+              <CategoryChart expenses={expenses} />
+              <CityBreakdown expenses={expenses} config={config} />
+            </div>
+            <div style={styles.sectionLabel}>Gastos recientes</div>
+            <ExpenseList expenses={expenses} onDelete={handleDelete} />
+          </>
+        )}
+
+        {activeTab === 'itinerario' && (
+          <Itinerary trip={trip} user={user} />
+        )}
       </main>
     </div>
   )
 }
 
 const styles = {
-  nav: { position: 'sticky', top: 0, zIndex: 50, height: 52, display: 'flex', alignItems: 'center', padding: '0 16px', background: 'rgba(8,10,15,0.85)', borderBottom: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(20px)' },
+  nav: { position: 'sticky', top: 0, zIndex: 50, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', background: 'rgba(8,10,15,0.85)', borderBottom: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(20px)' },
   navLeft: { display: 'flex', alignItems: 'center', gap: 8 },
-  backBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 26, cursor: 'pointer', lineHeight: 1, padding: '0 4px', marginRight: 4 },
+  backBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 26, cursor: 'pointer', lineHeight: 1, padding: '0 4px' },
   navLogo: { display: 'flex', alignItems: 'center', gap: 8 },
   navIcon: { width: 26, height: 26, borderRadius: 7, background: 'rgba(74,230,164,0.1)', border: '1px solid rgba(74,230,164,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 },
   navTitle: { fontFamily: 'var(--font-display)', fontSize: 17, color: '#fff' },
+  signOutBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', fontSize: 13, cursor: 'pointer' },
+  tabBar: { position: 'sticky', top: 52, zIndex: 49, background: 'rgba(8,10,15,0.9)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.06)' },
+  tabWrap: { maxWidth: 640, margin: '0 auto', display: 'flex', padding: '0 16px' },
+  tab: { padding: '12px 20px', fontSize: 14, fontWeight: 500, background: 'none', border: 'none', borderBottom: '2px solid transparent', color: 'rgba(255,255,255,0.35)', cursor: 'pointer', transition: 'all 0.15s' },
+  tabActive: { color: '#fff', borderBottomColor: '#4AE6A4' },
   main: { maxWidth: 640, margin: '0 auto', padding: '20px 16px 60px', position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: 12 },
   sectionLabel: { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)', marginTop: 12, marginBottom: -4 },
   chartsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 },
