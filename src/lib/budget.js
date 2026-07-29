@@ -38,15 +38,7 @@ export function getCategoryLabel(v) { return CATEGORIES.find(c => c.value === v)
 
 export function getTodayStr(config) {
   const tz = config?.timezone || 'America/New_York'
-  const now = toZonedTime(new Date(), tz)
-  return format(now, 'yyyy-MM-dd')
-}
-
-export function getYesterdayStr(config) {
-  const tz = config?.timezone || 'America/New_York'
-  const now = toZonedTime(new Date(), tz)
-  now.setDate(now.getDate() - 1)
-  return format(now, 'yyyy-MM-dd')
+  return format(toZonedTime(new Date(), tz), 'yyyy-MM-dd')
 }
 
 export function getTripInfo(config) {
@@ -65,79 +57,42 @@ export function getTripInfo(config) {
   return { started: true, ended: false, dayNumber: daysElapsed + 1, daysElapsed, remainingDays: totalDays - daysElapsed, totalDays }
 }
 
-// ─── Expense classification ───────────────────────────────────────────────────
-
-// ALL expenses (daily + outside daily) — used for total spent & analytics
-export function getAllExpenses(expenses) {
-  return expenses
-}
-
-// Only expenses that affect the daily budget calculation
+// Daily expenses only (prepaid=false)
 export function getDailyExpenses(expenses) {
   return expenses.filter(e => !e.prepaid)
 }
 
-// Expenses outside daily budget (prepaid=true) — still count toward total
-export function getOutsideDailyExpenses(expenses) {
-  return expenses.filter(e => e.prepaid)
-}
-
-// ─── Totals ───────────────────────────────────────────────────────────────────
-
-// Total spent = ALL expenses (daily + outside daily)
+// Total spent = ALL expenses
 export function getTotalSpent(expenses) {
   return expenses.reduce((s, e) => s + Number(e.amount), 0)
 }
 
-// Total remaining from the full usable budget
+// Remaining usable budget
 export function getRemaining(expenses, config) {
   const usable = config?.totalUsable ?? TRIP.totalUsable
   return usable - getTotalSpent(expenses)
 }
 
-// Fixed daily budget = totalUsable / totalDays (never changes)
-export function getFixedDailyBudget(config) {
-  const usable = config?.totalUsable ?? TRIP.totalUsable
-  const days = config?.totalDays || 16
-  return usable / days
-}
-
-// Smart recommended = remaining / remaining days
-export function getSmartDailyBudget(expenses, config) {
+// THE main formula: remaining / remaining days
+// Automatically distributes any surplus or deficit across all future days
+export function getDailyBudget(expenses, config) {
   const { remainingDays } = getTripInfo(config)
   if (remainingDays <= 0) return 0
-  return getRemaining(expenses, config) / remainingDays
+  return Math.max(getRemaining(expenses, config) / remainingDays, 0)
 }
 
-// Spent on a date — only daily expenses (exclude outside-daily)
-export function getSpentOnDate(expenses, dateStr) {
+// Today spent (daily expenses only)
+export function getTodaySpent(expenses, config) {
+  const today = getTodayStr(config)
   return getDailyExpenses(expenses)
-    .filter(e => e.date === dateStr)
+    .filter(e => e.date === today)
     .reduce((s, e) => s + Number(e.amount), 0)
 }
 
-// Yesterday's delta vs fixed budget (only daily expenses)
-export function getYesterdayDelta(expenses, config) {
-  const { started, dayNumber } = getTripInfo(config)
-  if (!started || dayNumber <= 1) return 0
-  const yesterday = getYesterdayStr(config)
-  const spent = getSpentOnDate(expenses, yesterday)
-  const fixed = getFixedDailyBudget(config)
-  return fixed - spent // positive = saved, negative = overspent
+// What's left to spend today
+export function getTodayRemaining(expenses, config) {
+  return getDailyBudget(expenses, config) - getTodaySpent(expenses, config)
 }
-
-// Today adjusted = fixed + yesterday delta
-export function getTodayAdjustedBudget(expenses, config) {
-  return getFixedDailyBudget(config) + getYesterdayDelta(expenses, config)
-}
-
-// Today spent — only daily expenses
-export function getTodaySpent(expenses, config) {
-  const today = getTodayStr(config)
-  return getSpentOnDate(expenses, today)
-}
-
-// ─── Analytics (all expenses) ─────────────────────────────────────────────────
 
 export function getByCategory(expenses) {
   const map = {}
